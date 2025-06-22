@@ -4,12 +4,12 @@ import * as yaml from 'js-yaml';
 // Helper classes for YAML serialization
 class DecisionFlowData {
   condition: string;
-  positivePath: string;
   negativePath: string;
+  positivePath: string;
   constructor(data: DecisionNodeData) {
     this.condition = data.condition;
-    this.positivePath = data.positivePath;
     this.negativePath = data.negativePath;
+    this.positivePath = data.positivePath;
   }
 }
 
@@ -35,8 +35,8 @@ const DecisionYamlType = new yaml.Type('!decision', {
   represent: (data: DecisionFlowData) => {
     return {
       condition: data.condition,
-      positivePath: data.positivePath,
       negativePath: data.negativePath,
+      positivePath: data.positivePath,
     };
   },
 });
@@ -79,7 +79,7 @@ export const INITIAL_NODES: FlowNode[] = [
   {
     id: 'highPurchaseCheck',
     type: 'decision',
-    position: { x: 150, y: 250 },
+    position: { x: 550, y: 250 },
     data: {
       condition: 'input.purchaseAmount > 100.0',
       positivePath: 'highDiscount',
@@ -89,7 +89,7 @@ export const INITIAL_NODES: FlowNode[] = [
   {
     id: 'noDiscount',
     type: 'terminator',
-    position: { x: 550, y: 250 },
+    position: { x: 150, y: 250 },
     data: {
       output: { discountPercentage: 0.0 },
     },
@@ -97,7 +97,7 @@ export const INITIAL_NODES: FlowNode[] = [
   {
     id: 'highDiscount',
     type: 'terminator',
-    position: { x: 50, y: 450 },
+    position: { x: 650, y: 450 },
     data: {
       output: { discountPercentage: 20.0 },
     },
@@ -105,7 +105,7 @@ export const INITIAL_NODES: FlowNode[] = [
   {
     id: 'standardDiscount',
     type: 'terminator',
-    position: { x: 250, y: 450 },
+    position: { x: 450, y: 450 },
     data: {
       output: { discountPercentage: 10.0 },
     },
@@ -244,8 +244,8 @@ export function autoLayout(nodes: FlowNode[], startNodeId: string): FlowNode[] {
 
     const children: string[] = [];
     if (uNode.type === 'decision') {
-      if (uNode.data.positivePath && nodeMap.has(uNode.data.positivePath)) children.push(uNode.data.positivePath);
       if (uNode.data.negativePath && nodeMap.has(uNode.data.negativePath)) children.push(uNode.data.negativePath);
+      if (uNode.data.positivePath && nodeMap.has(uNode.data.positivePath)) children.push(uNode.data.positivePath);
     }
 
     for (const vId of children) {
