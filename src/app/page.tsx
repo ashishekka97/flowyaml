@@ -117,6 +117,8 @@ export default function Home() {
           selectedNode={selectedNode}
           allNodes={nodes}
           onUpdateNode={updateNodeData}
+          inputs={inputs}
+          onUpdateInputs={setInputs}
         />
       </main>
     </div>

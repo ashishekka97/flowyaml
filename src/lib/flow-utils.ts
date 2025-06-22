@@ -1,5 +1,5 @@
 import { type FlowNode, type Input, type DecisionNode, type TerminatorNode } from '@/types';
-import { dump } from 'js-yaml';
+import * as yaml from 'js-yaml';
 
 export const INITIAL_INPUTS: Input[] = [
   { name: 'isLoyalCustomer', type: 'Boolean' },
@@ -86,7 +86,7 @@ export function generateYaml(nodes: FlowNode[], inputs: Input[], startNodeId: st
   });
   
   // A bit of a hack to get the !!map and !<tags> formatting right with js-yaml
-  let yamlString = dump(yamlObject, {
+  let yamlString = yaml.dump(yamlObject, {
     noRefs: true,
   });
 

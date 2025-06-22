@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Download, Bot } from 'lucide-react';
-import { type FlowNode } from '@/types';
+import { type FlowNode, type Input } from '@/types';
 import { Inspector } from './inspector';
+import { InputConfigurator } from './input-configurator';
 
 interface SidePanelProps {
   yamlCode: string;
@@ -14,9 +15,22 @@ interface SidePanelProps {
   selectedNode: FlowNode | undefined;
   allNodes: FlowNode[];
   onUpdateNode: (nodeId: string, data: any) => void;
+  inputs: Input[];
+  onUpdateInputs: (inputs: Input[]) => void;
 }
 
-export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onUpdateNode }: SidePanelProps) {
+export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onUpdateNode, inputs, onUpdateInputs }: SidePanelProps) {
+  const [activeTab, setActiveTab] = React.useState('yaml');
+
+  React.useEffect(() => {
+    if (selectedNode) {
+      setActiveTab('inspector');
+    } else {
+      if (activeTab === 'inspector') {
+        setActiveTab('yaml');
+      }
+    }
+  }, [selectedNode, activeTab]);
 
   const handleExport = () => {
     const blob = new Blob([yamlCode], { type: 'text/yaml' });
@@ -30,14 +44,13 @@ export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onUpda
     URL.revokeObjectURL(url);
   };
 
-  const activeTab = selectedNode ? 'inspector' : 'yaml';
-
   return (
     <Card className="w-96 h-full border-l rounded-none shadow-none flex flex-col">
-      <Tabs value={activeTab} className="flex flex-col flex-1">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1">
         <CardHeader className="flex-shrink-0">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="yaml">YAML</TabsTrigger>
+            <TabsTrigger value="inputs">Inputs</TabsTrigger>
             <TabsTrigger value="inspector" disabled={!selectedNode}>Inspector</TabsTrigger>
           </TabsList>
         </CardHeader>
@@ -48,6 +61,10 @@ export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onUpda
                <code>{yamlCode}</code>
              </pre>
            </CardContent>
+        </TabsContent>
+
+        <TabsContent value="inputs" className="flex-1 overflow-auto m-0">
+          <InputConfigurator inputs={inputs} onUpdateInputs={onUpdateInputs} />
         </TabsContent>
 
         <TabsContent value="inspector" className="flex-1 overflow-auto m-0">
