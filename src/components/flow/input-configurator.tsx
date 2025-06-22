@@ -31,12 +31,12 @@ export function InputConfigurator({ inputs, onUpdateInputs }: InputConfiguratorP
   };
 
   return (
-    <Card className="h-full border-none shadow-none rounded-none flex flex-col">
-      <CardHeader className="flex-shrink-0">
+    <Card className="border-none shadow-none rounded-none">
+      <CardHeader>
         <CardTitle>Configure Inputs</CardTitle>
         <CardDescription>Define the inputs for your flowchart.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6 overflow-y-auto flex-1">
+      <CardContent className="space-y-6">
         <div className="space-y-4">
           <h3 className="text-sm font-medium text-muted-foreground">Current Inputs</h3>
           <div className="space-y-2">

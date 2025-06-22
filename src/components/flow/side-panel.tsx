@@ -1,14 +1,13 @@
 "use client";
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Download, Bot, Wand2, Upload } from 'lucide-react';
 import { type FlowNode, type Input } from '@/types';
 import { Inspector } from './inspector';
 import { InputConfigurator } from './input-configurator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface SidePanelProps {
   yamlCode: string;
@@ -93,21 +92,17 @@ export function SidePanel({ yamlCode, onAutoLayout, onValidate, onLoadYaml, sele
           </TabsList>
         </CardHeader>
         
-        <TabsContent value="yaml" className="flex-1 flex flex-col m-0">
-           <CardContent className="flex-1 p-0">
-             <ScrollArea className="h-full">
-               <pre className="text-xs p-4 bg-gray-900 text-white font-mono whitespace-pre-wrap break-all">
-                 <code>{yamlCode}</code>
-               </pre>
-             </ScrollArea>
-           </CardContent>
+        <TabsContent value="yaml" className="flex-1 m-0 overflow-y-auto">
+           <pre className="text-xs p-4 bg-gray-900 text-white font-mono whitespace-pre-wrap break-all">
+             <code>{yamlCode}</code>
+           </pre>
         </TabsContent>
 
-        <TabsContent value="inputs" className="flex-1 flex flex-col m-0">
+        <TabsContent value="inputs" className="flex-1 m-0 overflow-y-auto">
           <InputConfigurator inputs={inputs} onUpdateInputs={onUpdateInputs} />
         </TabsContent>
 
-        <TabsContent value="inspector" className="flex-1 overflow-auto m-0">
+        <TabsContent value="inspector" className="flex-1 m-0 overflow-y-auto">
           {selectedNode ? (
             <Inspector 
               node={selectedNode} 
