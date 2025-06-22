@@ -39,13 +39,15 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
         const negativeTargetNode = nodeMap.get(node.data.negativePath);
         
         if (sourceNode && positiveTargetNode) {
-          const fromPos: NodePosition = { x: sourceNode.position.x + 100, y: sourceNode.position.y + 100 };
+          // Positive path from RIGHT side
+          const fromPos: NodePosition = { x: sourceNode.position.x + 200, y: sourceNode.position.y + 50 };
           const toPos: NodePosition = { x: positiveTargetNode.position.x + 100, y: positiveTargetNode.position.y };
           lines.push(<ConnectorLine key={`${node.id}-pos`} from={fromPos} to={toPos} isPositive />);
         }
         
         if (sourceNode && negativeTargetNode) {
-          const fromPos: NodePosition = { x: sourceNode.position.x + 200, y: sourceNode.position.y + 50 };
+          // Negative path from LEFT side
+          const fromPos: NodePosition = { x: sourceNode.position.x, y: sourceNode.position.y + 50 };
           const toPos: NodePosition = { x: negativeTargetNode.position.x + 100, y: negativeTargetNode.position.y };
           lines.push(<ConnectorLine key={`${node.id}-neg`} from={fromPos} to={toPos} isPositive={false} />);
         }
