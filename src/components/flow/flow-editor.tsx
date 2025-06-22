@@ -38,8 +38,8 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
     for (const node of nodes) {
       if (node.type === 'decision') {
         const sourceNode = nodeMap.get(node.id);
-        const positiveTargetNode = nodeMap.get(node.data.positivePath);
         const negativeTargetNode = nodeMap.get(node.data.negativePath);
+        const positiveTargetNode = nodeMap.get(node.data.positivePath);
         
         if (sourceNode && negativeTargetNode) {
           const fromPos: NodePosition = { x: sourceNode.position.x, y: sourceNode.position.y + 50 };
@@ -48,7 +48,7 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
           if (negativeTargetNode.type === 'decision') {
             toPos = { x: negativeTargetNode.position.x + 100, y: negativeTargetNode.position.y };
           } else { // terminator
-            toPos = { x: negativeTargetNode.position.x, y: negativeTargetNode.position.y + 40 };
+            toPos = { x: negativeTargetNode.position.x + 100, y: negativeTargetNode.position.y };
           }
           
           lines.push(<ConnectorLine key={`${node.id}-neg`} from={fromPos} to={toPos} isPositive={false} />);
@@ -61,7 +61,7 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
           if (positiveTargetNode.type === 'decision') {
             toPos = { x: positiveTargetNode.position.x + 100, y: positiveTargetNode.position.y };
           } else { // terminator
-            toPos = { x: positiveTargetNode.position.x, y: positiveTargetNode.position.y + 40 };
+            toPos = { x: positiveTargetNode.position.x + 100, y: positiveTargetNode.position.y };
           }
 
           lines.push(<ConnectorLine key={`${node.id}-pos`} from={fromPos} to={toPos} isPositive />);
