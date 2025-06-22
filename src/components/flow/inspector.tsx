@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Trash2 } from 'lucide-react';
+import * as yaml from 'js-yaml';
 
 interface InspectorProps {
   node: FlowNode;
@@ -70,17 +71,19 @@ export function Inspector({ node, allNodes, onUpdate, onDelete, isStartNode }: I
 
   const renderTerminatorForm = (data: TerminatorNodeData) => (
     <div className="space-y-2">
-      <Label htmlFor="output">Output (JSON)</Label>
+      <Label htmlFor="output">Output (YAML)</Label>
       <Textarea
         id="output"
         name="output"
-        value={JSON.stringify(data.output, null, 2)}
+        value={yaml.dump(data.output, { indent: 2 })}
         onChange={(e) => {
           try {
-            const parsed = JSON.parse(e.target.value);
-            setFormData({ output: parsed });
+            const parsed = yaml.load(e.target.value);
+            if (typeof parsed === 'object' && parsed !== null) {
+              setFormData({ output: parsed });
+            }
           } catch (err) {
-            // Ignore invalid JSON while typing
+            // Ignore invalid YAML while typing
           }
         }}
         rows={4}

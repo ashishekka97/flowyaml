@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DecisionIcon, TerminatorIcon } from '@/components/icons';
+import * as yaml from 'js-yaml';
 
 interface FlowNodeProps extends React.HTMLAttributes<HTMLDivElement> {
   node: FlowNode;
@@ -53,12 +54,13 @@ export function FlowNodeComponent({ node, isStart, isSelected, ...props }: FlowN
           </div>
         );
       case 'terminator':
+        const outputYaml = yaml.dump(node.data.output, { flowLevel: 1 }).trim();
         return (
           <Card className={cn("w-full h-[80px] rounded-[40px] border-2 flex items-center justify-center", isSelected ? 'border-primary shadow-2xl' : 'shadow-lg')}>
               <div className="flex flex-col items-center justify-center text-center p-2">
                  <p className="text-xs font-bold text-foreground truncate">{node.id}</p>
-                 <p className="text-xs text-muted-foreground truncate" title={JSON.stringify(node.data.output)}>
-                    Output: {JSON.stringify(node.data.output)}
+                 <p className="text-xs text-muted-foreground truncate" title={outputYaml}>
+                    Output: {outputYaml}
                  </p>
               </div>
           </Card>
