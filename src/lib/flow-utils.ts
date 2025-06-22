@@ -24,6 +24,14 @@ class TerminatorFlowData {
 const DecisionYamlType = new yaml.Type('!<decision>', {
   kind: 'mapping',
   instanceOf: DecisionFlowData,
+  construct: (data: any): DecisionFlowData => {
+    const d = data || {};
+    return new DecisionFlowData({
+        condition: d.condition || '',
+        positivePath: d.positivePath || '',
+        negativePath: d.negativePath || '',
+    });
+  },
   represent: (data: DecisionFlowData) => {
     return {
       condition: data.condition,
@@ -36,6 +44,10 @@ const DecisionYamlType = new yaml.Type('!<decision>', {
 const TerminatorYamlType = new yaml.Type('!<terminator>', {
   kind: 'mapping',
   instanceOf: TerminatorFlowData,
+  construct: (data: any): TerminatorFlowData => {
+    const d = data || {};
+    return new TerminatorFlowData({ output: d.output || {} });
+  },
   represent: (data: TerminatorFlowData) => {
     return {
       output: data.output,
@@ -128,6 +140,73 @@ export function generateYaml(nodes: FlowNode[], inputs: Input[], startNodeId: st
   // We can decode them for display purposes.
   return decodeURI(yamlString);
 }
+
+export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Input[], startNodeId: string } {
+    const parsed: any = yaml.load(yamlString, { schema: FLOW_SCHEMA });
+  
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('Invalid YAML format: root should be an object.');
+    }
+    if (!parsed.startNode || typeof parsed.startNode !== 'string') {
+      throw new Error('Invalid YAML format: missing or invalid startNode.');
+    }
+    if (parsed.nodes === undefined || parsed.nodes === null || typeof parsed.nodes !== 'object') {
+      throw new Error('Invalid YAML format: missing or invalid nodes map.');
+    }
+  
+    const inputs: Input[] = parsed.inputs || [];
+    const startNodeId: string = parsed.startNode;
+    const nodes: FlowNode[] = [];
+  
+    for (const nodeId in parsed.nodes) {
+      if (Object.prototype.hasOwnProperty.call(parsed.nodes, nodeId)) {
+          const nodeData = parsed.nodes[nodeId];
+          let nodeType: 'decision' | 'terminator' | null = null;
+          let data: any = {};
+  
+          if (nodeData instanceof DecisionFlowData) {
+              nodeType = 'decision';
+              data = {
+                  condition: nodeData.condition,
+                  positivePath: nodeData.positivePath,
+                  negativePath: nodeData.negativePath,
+              };
+          } else if (nodeData instanceof TerminatorFlowData) {
+              nodeType = 'terminator';
+              data = {
+                  output: nodeData.output,
+              };
+          } else if (nodeData && typeof nodeData === 'object') { // Fallback for no tags
+              if ('condition' in nodeData) {
+                  nodeType = 'decision';
+                  data = {
+                      condition: nodeData.condition || '',
+                      positivePath: nodeData.positivePath || '',
+                      negativePath: nodeData.negativePath || '',
+                  };
+              } else if ('output' in nodeData) {
+                  nodeType = 'terminator';
+                  data = {
+                      output: nodeData.output || {},
+                  };
+              }
+          }
+  
+          if (nodeType) {
+              nodes.push({
+                  id: nodeId,
+                  type: nodeType,
+                  position: { x: 0, y: 0 }, // Position will be set by autoLayout
+                  data,
+              });
+          } else {
+              throw new Error(`Invalid or unknown node type for node ID: ${nodeId}`);
+          }
+      }
+    }
+    
+    return { nodes, inputs, startNodeId };
+  }
 
 export function autoLayout(nodes: FlowNode[], startNodeId: string): FlowNode[] {
   if (!nodes.length || !nodes.some(n => n.id === startNodeId)) return nodes;

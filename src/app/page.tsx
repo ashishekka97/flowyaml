@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { type FlowNode, type Input, type NodePosition } from '@/types';
-import { INITIAL_NODES, INITIAL_INPUTS, INITIAL_START_NODE_ID, generateYaml, autoLayout } from '@/lib/flow-utils';
+import { INITIAL_NODES, INITIAL_INPUTS, INITIAL_START_NODE_ID, generateYaml, autoLayout, parseYaml } from '@/lib/flow-utils';
 import { Header } from '@/components/header';
 import { NodePalette } from '@/components/flow/node-palette';
 import { FlowEditor } from '@/components/flow/flow-editor';
@@ -218,6 +218,37 @@ export default function Home() {
     }
   }, [zoom, handleZoomChange]);
 
+  const handleLoadYaml = React.useCallback((yamlString: string) => {
+    try {
+      const { nodes: loadedNodes, inputs: loadedInputs, startNodeId: loadedStartNodeId } = parseYaml(yamlString);
+
+      if (!loadedNodes.some(n => n.id === loadedStartNodeId)) {
+        throw new Error(`The specified start node "${loadedStartNodeId}" does not exist in the list of nodes.`);
+      }
+
+      const laidOutNodes = autoLayout(loadedNodes, loadedStartNodeId);
+
+      setInputs(loadedInputs);
+      setStartNodeId(loadedStartNodeId);
+      setNodes(laidOutNodes);
+      
+      setSelectedNodeId(null);
+
+      toast({
+        title: "YAML Loaded",
+        description: "Flowchart has been loaded onto the canvas.",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "An unknown error occurred while parsing the YAML file.";
+      toast({
+        variant: "destructive",
+        title: "Load Failed",
+        description: message,
+      });
+      console.error(error);
+    }
+  }, [toast]);
+
   const selectedNode = React.useMemo(() => nodes.find(n => n.id === selectedNodeId), [nodes, selectedNodeId]);
 
   return (
@@ -240,6 +271,7 @@ export default function Home() {
           yamlCode={yamlCode}
           onAutoLayout={handleAutoLayout}
           onValidate={handleValidation}
+          onLoadYaml={handleLoadYaml}
           selectedNode={selectedNode}
           allNodes={nodes}
           onSaveNode={handleNodeSave}
