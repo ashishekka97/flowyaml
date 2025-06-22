@@ -9,7 +9,10 @@ interface ConnectorLineProps {
 }
 
 export function ConnectorLine({ from, to, isPositive }: ConnectorLineProps) {
-  const pathData = `M${from.x},${from.y} C${from.x},${(from.y + to.y) / 2} ${to.x},${(from.y + to.y) / 2} ${to.x},${to.y}`;
+  // Use a VHV (Vertical-Horizontal-Vertical) polyline to avoid passing through other nodes.
+  // This creates a path with 90-degree elbows.
+  const midY = from.y + 30; // Creates a small vertical segment before turning
+  const pathData = `M${from.x},${from.y} L${from.x},${midY} L${to.x},${midY} L${to.x},${to.y}`;
   const labelText = isPositive === true ? 'True' : (isPositive === false ? 'False' : null);
 
   return (
