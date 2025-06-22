@@ -28,8 +28,8 @@ const DecisionYamlType = new yaml.Type('!decision', {
     const d = data || {};
     return new DecisionFlowData({
         condition: d.condition || '',
-        positivePath: d.positivePath || '',
         negativePath: d.negativePath || '',
+        positivePath: d.positivePath || '',
     });
   },
   represent: (data: DecisionFlowData) => {
@@ -72,8 +72,8 @@ export const INITIAL_NODES: FlowNode[] = [
     position: { x: 350, y: 50 },
     data: {
       condition: 'input.isLoyalCustomer == true',
-      positivePath: 'highPurchaseCheck',
       negativePath: 'noDiscount',
+      positivePath: 'highPurchaseCheck',
     },
   },
   {
@@ -82,8 +82,8 @@ export const INITIAL_NODES: FlowNode[] = [
     position: { x: 550, y: 250 },
     data: {
       condition: 'input.purchaseAmount > 100.0',
-      positivePath: 'highDiscount',
       negativePath: 'standardDiscount',
+      positivePath: 'highDiscount',
     },
   },
   {
@@ -211,17 +211,16 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
 export function autoLayout(nodes: FlowNode[], startNodeId: string): FlowNode[] {
   if (!nodes.length || !nodes.some(n => n.id === startNodeId)) return nodes;
 
-  const LEVEL_HEIGHT = 200; // Vertical distance between levels
-  const NODE_WIDTH = 300;   // Horizontal distance between nodes on the same level
-  const PADDING = 50;       // Padding from the top
+  const LEVEL_HEIGHT = 200;
+  const NODE_WIDTH = 300;
+  const PADDING = 50;
 
   const nodeMap = new Map(nodes.map(n => [n.id, n]));
   const levels = new Map<string, number>();
   const nodesPerLevel = new Map<number, string[]>();
   const visited = new Set<string>();
   const queue: string[] = [];
-  
-  // Graph traversal (BFS) to determine levels
+
   if (nodeMap.has(startNodeId)) {
     queue.push(startNodeId);
     visited.add(startNodeId);
@@ -237,63 +236,102 @@ export function autoLayout(nodes: FlowNode[], startNodeId: string): FlowNode[] {
     if (!nodesPerLevel.has(uLevel)) {
       nodesPerLevel.set(uLevel, []);
     }
-    // Avoid adding duplicates to the same level if there's a loop
     if (!nodesPerLevel.get(uLevel)!.includes(uId)) {
-        nodesPerLevel.get(uLevel)!.push(uId);
+      nodesPerLevel.get(uLevel)!.push(uId);
     }
 
-    const children: string[] = [];
     if (uNode.type === 'decision') {
-      if (uNode.data.negativePath && nodeMap.has(uNode.data.negativePath)) children.push(uNode.data.negativePath);
-      if (uNode.data.positivePath && nodeMap.has(uNode.data.positivePath)) children.push(uNode.data.positivePath);
-    }
-
-    for (const vId of children) {
-      if (!visited.has(vId)) {
-        visited.add(vId);
-        const vLevel = uLevel + 1;
-        levels.set(vId, vLevel);
-        queue.push(vId);
+      const children = [uNode.data.negativePath, uNode.data.positivePath].filter(id => id && nodeMap.has(id));
+      for (const vId of children) {
+        if (!visited.has(vId)) {
+          visited.add(vId);
+          levels.set(vId, uLevel + 1);
+          queue.push(vId);
+        }
       }
     }
   }
-
-  // Position nodes that were not reachable from the start node
-  let lastLevel = (nodesPerLevel.size > 0 ? Math.max(...nodesPerLevel.keys()) : -1) + 1;
-  for (const node of nodes) {
-    if (!visited.has(node.id)) {
-      if (!nodesPerLevel.has(lastLevel)) {
-        nodesPerLevel.set(lastLevel, []);
+  
+  let lastDiscoveredLevel = nodesPerLevel.size > 0 ? Math.max(...nodesPerLevel.keys()) : -1;
+  nodes.forEach(node => {
+      if (!visited.has(node.id)) {
+          lastDiscoveredLevel++;
+          if (!nodesPerLevel.has(lastDiscoveredLevel)) {
+              nodesPerLevel.set(lastDiscoveredLevel, []);
+          }
+          nodesPerLevel.get(lastDiscoveredLevel)!.push(node.id);
+          visited.add(node.id);
       }
-      nodesPerLevel.get(lastLevel)!.push(node.id);
-      levels.set(node.id, lastLevel);
-      visited.add(node.id);
-    }
-  }
+  });
 
-  // Calculate positions
+
+  const decisionNodesPerLevel = new Map<number, string[]>();
+  const terminatorNodeIds: string[] = [];
+
+  nodesPerLevel.forEach((levelNodeIds, level) => {
+    const decisions: string[] = [];
+    levelNodeIds.forEach(nodeId => {
+      if (nodeMap.get(nodeId)!.type === 'decision') {
+        decisions.push(nodeId);
+      } else {
+        if (!terminatorNodeIds.includes(nodeId)) {
+            terminatorNodeIds.push(nodeId);
+        }
+      }
+    });
+    if (decisions.length > 0) {
+      decisionNodesPerLevel.set(level, decisions);
+    }
+  });
+
+  nodes.forEach(node => {
+    if(node.type === 'terminator' && !terminatorNodeIds.includes(node.id)) {
+        terminatorNodeIds.push(node.id);
+    }
+  });
+
   const newNodes = [...nodes];
-  const maxLevelWidth = Math.max(1, ...Array.from(nodesPerLevel.values()).map(levelNodes => levelNodes.length));
-  const canvasWidth = maxLevelWidth * NODE_WIDTH;
+  const maxDecisionLevel = decisionNodesPerLevel.size > 0 ? Math.max(...decisionNodesPerLevel.keys()) : -1;
+  
+  const maxDecisionLevelWidth = Math.max(0, ...Array.from(decisionNodesPerLevel.values()).map(levelNodes => levelNodes.length));
+  const canvasWidth = Math.max(maxDecisionLevelWidth, terminatorNodeIds.length) * NODE_WIDTH;
 
-  nodesPerLevel.forEach((levelNodes, level) => {
+  decisionNodesPerLevel.forEach((levelNodeIds, level) => {
     const levelY = level * LEVEL_HEIGHT + PADDING;
-    const levelWidth = levelNodes.length * NODE_WIDTH;
+    const levelWidth = levelNodeIds.length * NODE_WIDTH;
     const startX = (canvasWidth - levelWidth) / 2 + PADDING;
 
-    levelNodes.forEach((nodeId, i) => {
+    levelNodeIds.sort((a,b) => a.localeCompare(b));
+
+    levelNodeIds.forEach((nodeId, i) => {
       const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
       if (nodeIndex !== -1) {
-        newNodes[nodeIndex] = {
-          ...newNodes[nodeIndex],
-          position: {
-            x: startX + i * NODE_WIDTH,
-            y: levelY,
-          },
+        newNodes[nodeIndex].position = {
+          x: startX + i * NODE_WIDTH,
+          y: levelY,
         };
       }
     });
   });
+
+  if (terminatorNodeIds.length > 0) {
+    const terminatorLevel = maxDecisionLevel + 1;
+    const levelY = terminatorLevel * LEVEL_HEIGHT + PADDING;
+    const levelWidth = terminatorNodeIds.length * NODE_WIDTH;
+    const startX = (canvasWidth - levelWidth) / 2 + PADDING;
+
+    terminatorNodeIds.sort((a,b) => a.localeCompare(b));
+
+    terminatorNodeIds.forEach((nodeId, i) => {
+      const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
+      if (nodeIndex !== -1) {
+        newNodes[nodeIndex].position = {
+          x: startX + i * NODE_WIDTH,
+          y: levelY,
+        };
+      }
+    });
+  }
 
   return newNodes;
 }
