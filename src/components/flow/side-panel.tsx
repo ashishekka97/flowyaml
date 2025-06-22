@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Download, Bot, Wand2, Upload } from 'lucide-react';
@@ -83,7 +83,7 @@ export function SidePanel({ yamlCode, onAutoLayout, onValidate, onLoadYaml, sele
           accept=".yaml,.yml"
           className="hidden"
       />
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
         <CardHeader className="flex-shrink-0">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="yaml">YAML</TabsTrigger>
@@ -93,7 +93,7 @@ export function SidePanel({ yamlCode, onAutoLayout, onValidate, onLoadYaml, sele
         </CardHeader>
         
         <TabsContent value="yaml" className="flex-1 m-0 overflow-y-auto">
-           <div className="bg-gray-900 h-full">
+           <div className="bg-gray-900">
             <pre className="text-xs p-4 text-white font-mono whitespace-pre-wrap break-all">
                 <code>{yamlCode}</code>
             </pre>
@@ -117,26 +117,25 @@ export function SidePanel({ yamlCode, onAutoLayout, onValidate, onLoadYaml, sele
             <div className="p-4 text-center text-muted-foreground">Select a node to inspect its properties.</div>
           )}
         </TabsContent>
-        
-        <div className="p-4 border-t flex-shrink-0 bg-card space-y-2">
-            <Button onClick={onAutoLayout} className="w-full" variant="secondary">
-              <Wand2 className="mr-2 h-4 w-4" />
-              Auto-Layout
-            </Button>
-            <Button onClick={onValidate} className="w-full" variant="secondary">
-              <Bot className="mr-2 h-4 w-4" />
-              Validate with AI
-            </Button>
-            <Button onClick={handleLoadClick} className="w-full">
-              <Upload className="mr-2 h-4 w-4" />
-              Load YAML
-            </Button>
-            <Button onClick={handleExport} className="w-full">
-              <Download className="mr-2 h-4 w-4" />
-              Export YAML
-            </Button>
-        </div>
       </Tabs>
+      <div className="p-4 border-t flex-shrink-0 bg-card space-y-2">
+          <Button onClick={onAutoLayout} className="w-full" variant="secondary">
+            <Wand2 className="mr-2 h-4 w-4" />
+            Auto-Layout
+          </Button>
+          <Button onClick={onValidate} className="w-full" variant="secondary">
+            <Bot className="mr-2 h-4 w-4" />
+            Validate with AI
+          </Button>
+          <Button onClick={handleLoadClick} className="w-full">
+            <Upload className="mr-2 h-4 w-4" />
+            Load YAML
+          </Button>
+          <Button onClick={handleExport} className="w-full">
+            <Download className="mr-2 h-4 w-4" />
+            Export YAML
+          </Button>
+      </div>
     </Card>
   );
 }
