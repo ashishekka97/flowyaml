@@ -265,7 +265,7 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
       }
     });
   
-    // 2. Iteratively fix violations (upward-pointing edges)
+    // 2. Iteratively fix violations (upward-pointing or same-level edges)
     let changed = true;
     while (changed) {
       changed = false;
@@ -276,10 +276,10 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
             .forEach(vId => {
               const uLevel = levels.get(u.id)!;
               const vLevel = levels.get(vId)!;
-              // If an edge goes from a higher level to a lower level, it's a violation.
-              // Move the lower-level node down to the same level as the higher one.
-              if (uLevel > vLevel) {
-                levels.set(vId, uLevel);
+              // If an edge points to the same or an earlier level, it's a violation.
+              // Move the target node down one level.
+              if (uLevel >= vLevel) {
+                levels.set(vId, uLevel + 1);
                 changed = true;
               }
             });
