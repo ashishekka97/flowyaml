@@ -23,10 +23,14 @@ interface InspectorProps {
 export function Inspector({ node, allNodes, onSave, onDelete, isStartNode }: InspectorProps) {
   const [id, setId] = React.useState(node.id);
   const [formData, setFormData] = React.useState(node.data);
+  const [terminatorOutputYaml, setTerminatorOutputYaml] = React.useState('');
 
   React.useEffect(() => {
     setId(node.id);
     setFormData(node.data);
+    if (node.type === 'terminator') {
+      setTerminatorOutputYaml(yaml.dump((node.data as TerminatorNodeData).output, { indent: 2 }));
+    }
   }, [node]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -39,7 +43,22 @@ export function Inspector({ node, allNodes, onSave, onDelete, isStartNode }: Ins
   };
 
   const handleSave = () => {
-    onSave(node.id, id, formData);
+    let dataToSave = formData;
+    if (node.type === 'terminator') {
+      try {
+        const parsed = yaml.load(terminatorOutputYaml);
+        if (typeof parsed === 'object' && parsed !== null) {
+          dataToSave = { ...formData, output: parsed };
+        } else {
+          console.warn("Terminator output is not a valid YAML object. Changes not saved.");
+          return;
+        }
+      } catch (err) {
+        console.error("Invalid YAML format in terminator node. Changes not saved.", err);
+        return;
+      }
+    }
+    onSave(node.id, id, dataToSave);
   };
   
   const otherNodes = allNodes.filter(n => n.id !== node.id);
@@ -77,17 +96,8 @@ export function Inspector({ node, allNodes, onSave, onDelete, isStartNode }: Ins
       <Textarea
         id="output"
         name="output"
-        value={yaml.dump(data.output, { indent: 2 })}
-        onChange={(e) => {
-          try {
-            const parsed = yaml.load(e.target.value);
-            if (typeof parsed === 'object' && parsed !== null) {
-              setFormData({ output: parsed });
-            }
-          } catch (err) {
-            // Ignore invalid YAML while typing
-          }
-        }}
+        value={terminatorOutputYaml}
+        onChange={(e) => setTerminatorOutputYaml(e.target.value)}
         rows={4}
       />
     </div>
