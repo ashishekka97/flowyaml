@@ -37,20 +37,20 @@ export function FlowNodeComponent({ node, isStart, isSelected, ...props }: FlowN
     switch (node.type) {
       case 'decision':
         return (
-          <Card className={cn("w-full h-[80px] border-2", isSelected ? 'border-primary shadow-2xl' : 'shadow-lg')}>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[110px]">
-              <DecisionIcon className="w-full h-full text-card fill-current" />
-              <div className={cn("absolute inset-0 border-[2px] rounded-full rotate-45", isSelected ? 'border-primary' : 'border-transparent')}>
-                 <DecisionIcon className={cn("w-full h-full text-card fill-current transition-colors", isSelected ? 'text-primary/10' : 'text-card')} />
-              </div>
-            </div>
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
+          <div className={cn("relative w-full aspect-[2/1]", isSelected ? "drop-shadow-2xl" : "drop-shadow-lg")}>
+            <DecisionIcon
+              className={cn(
+                "w-full h-full fill-card stroke-2",
+                isSelected ? "stroke-primary" : "stroke-border"
+              )}
+            />
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8">
               <p className="text-xs font-bold text-foreground truncate">{node.id}</p>
               <p className="text-xs text-muted-foreground truncate" title={node.data.condition}>
                 {node.data.condition}
               </p>
             </div>
-          </Card>
+          </div>
         );
       case 'terminator':
         return (

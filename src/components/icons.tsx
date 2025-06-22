@@ -1,7 +1,7 @@
 import React from 'react';
 
 export const DecisionIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 100 100" {...props}>
+  <svg viewBox="0 0 100 100" preserveAspectRatio="none" {...props}>
     <polygon points="50,0 100,50 50,100 0,50" />
   </svg>
 );
