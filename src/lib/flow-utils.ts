@@ -1,4 +1,4 @@
-import { type FlowNode, type Input, type DecisionNodeData, type TerminatorNodeData } from '@/types';
+import { type FlowNode, type Input, type DecisionNode, type DecisionNodeData, type TerminatorNodeData } from '@/types';
 import * as yaml from 'js-yaml';
 
 // Helper classes for YAML serialization
@@ -230,6 +230,11 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
     if (!nodes.length || !nodes.some(n => n.id === startNodeId)) return nodes;
   
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const newNodes = [...nodes];
+    const positions = new Map<string, { x: number, y: number }>();
+    const PADDING = 50;
+    const LEVEL_HEIGHT = 200;
+    const NODE_WIDTH = 350;
   
     // 1. Assign levels to ensure a strict top-to-bottom flow (calculates longest path)
     const levels = new Map<string, number>();
@@ -288,26 +293,19 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
             levels.set(n.id, 0); 
         }
     });
-
-    const newNodes = [...nodes];
-    const positions = new Map<string, { x: number, y: number }>();
-    const PADDING = 50;
-    const LEVEL_HEIGHT = 200;
-    const NODE_WIDTH = 350;
-
-    // Group nodes by their final calculated level
+    
     const nodesByLevel = new Map<number, string[]>();
     newNodes.forEach(n => {
         const level = levels.get(n.id)!;
         if (!nodesByLevel.has(level)) nodesByLevel.set(level, []);
         nodesByLevel.get(level)!.push(n.id);
     });
-
-    // Position terminator nodes first, they form the layout baseline
+    
+    const decisionNodes = newNodes.filter(n => n.type === 'decision');
     const terminatorNodes = newNodes.filter(n => n.type === 'terminator');
     terminatorNodes.sort((a,b) => a.id.localeCompare(b.id));
 
-    const decisionNodes = newNodes.filter(n => n.type === 'decision');
+    // 2. Position terminator nodes first, they form the layout baseline
     const decisionLevels = Array.from(new Set(decisionNodes.map(n => levels.get(n.id)!)));
     const maxDecisionLevel = decisionLevels.length > 0 ? Math.max(...decisionLevels) : -1;
     const terminatorY = (maxDecisionLevel + 1) * LEVEL_HEIGHT + PADDING;
@@ -316,7 +314,7 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
         positions.set(node.id, { x: i * NODE_WIDTH + PADDING, y: terminatorY });
     });
 
-    // Position decision nodes bottom-up
+    // 3. Position decision nodes bottom-up
     const sortedDecisionLevels = decisionLevels.sort((a,b) => b-a);
     for (const level of sortedDecisionLevels) {
         const levelNodes = nodesByLevel.get(level)!.filter(id => nodeMap.get(id)?.type === 'decision');
@@ -331,7 +329,6 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
                 const childPositions = childrenIds.map(id => positions.get(id)!);
                 x = childPositions.reduce((sum, pos) => sum + pos.x, 0) / childPositions.length;
             } else {
-                // If no positioned children, find a gap.
                 const nodesOnLevel = nodesByLevel.get(level)!;
                 const nodeIndex = nodesOnLevel.indexOf(nodeId);
                 x = nodeIndex * NODE_WIDTH + PADDING; 
@@ -340,10 +337,13 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
         }
     }
   
-    // Resolve overlaps by spreading nodes on each level
+    // 4. Resolve overlaps by spreading decision nodes on each level
     const allLevels = Array.from(nodesByLevel.keys()).sort((a,b) => a-b);
     for (const level of allLevels) {
-        const levelNodeIds = nodesByLevel.get(level)!;
+        // ONLY PROCESS DECISION NODES IN THIS LOOP
+        const levelNodeIds = nodesByLevel.get(level)!.filter(id => nodeMap.get(id)?.type === 'decision');
+        if (levelNodeIds.length < 2) continue;
+
         const levelPositions = levelNodeIds.map(id => ({ id, pos: positions.get(id)! })).filter(item => item.pos);
         levelPositions.sort((a, b) => a.pos.x - b.pos.x);
         
@@ -357,16 +357,25 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
                 nodeB.pos.x += shift;
             }
         }
-        // Re-center the whole level after spreading
+        // Re-center the whole level after spreading to align with the overall diagram
         const totalWidth = levelPositions.length > 0 ? levelPositions[levelPositions.length-1].pos.x - levelPositions[0].pos.x : 0;
         const currentCenter = totalWidth / 2 + (levelPositions[0]?.pos.x || 0);
-        const canvasCenter = (terminatorNodes.length * NODE_WIDTH) / 2;
+        
+        const terminatorPositions = terminatorNodes.map(n => positions.get(n.id)!).filter(Boolean);
+        let canvasCenter = PADDING;
+        if (terminatorPositions.length > 0) {
+            const minX = Math.min(...terminatorPositions.map(p => p.x));
+            const maxX = Math.max(...terminatorPositions.map(p => p.x));
+            canvasCenter = (minX + maxX) / 2;
+        } else if (levelPositions.length > 0) {
+            canvasCenter = (levelPositions[0].pos.x + levelPositions[levelPositions.length-1].pos.x) / 2;
+        }
+        
         const shift = canvasCenter - currentCenter;
-
         levelPositions.forEach(item => item.pos.x += shift);
     }
     
-    // Assign final positions
+    // 5. Assign final positions
     newNodes.forEach(node => {
       if (positions.has(node.id)) {
         node.position = positions.get(node.id)!;
@@ -375,3 +384,5 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
   
     return newNodes;
   }
+
+    
