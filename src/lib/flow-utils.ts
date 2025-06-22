@@ -1,5 +1,5 @@
 import { type FlowNode, type Input, type DecisionNode, type TerminatorNode } from '@/types';
-import {- Indent, dump } from 'js-yaml';
+import { dump } from 'js-yaml';
 
 export const INITIAL_INPUTS: Input[] = [
   { name: 'isLoyalCustomer', type: 'Boolean' },
