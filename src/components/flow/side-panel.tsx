@@ -4,7 +4,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, Bot } from 'lucide-react';
+import { Download, Bot, Wand2 } from 'lucide-react';
 import { type FlowNode, type Input } from '@/types';
 import { Inspector } from './inspector';
 import { InputConfigurator } from './input-configurator';
@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface SidePanelProps {
   yamlCode: string;
+  onAutoLayout: () => void;
   onValidate: () => void;
   selectedNode: FlowNode | undefined;
   allNodes: FlowNode[];
@@ -22,7 +23,7 @@ interface SidePanelProps {
   onUpdateInputs: (inputs: Input[]) => void;
 }
 
-export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onSaveNode, onDeleteNode, startNodeId, inputs, onUpdateInputs }: SidePanelProps) {
+export function SidePanel({ yamlCode, onAutoLayout, onValidate, selectedNode, allNodes, onSaveNode, onDeleteNode, startNodeId, inputs, onUpdateInputs }: SidePanelProps) {
   const [activeTab, setActiveTab] = React.useState('yaml');
 
   React.useEffect(() => {
@@ -87,6 +88,10 @@ export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onSave
         </TabsContent>
         
         <div className="p-4 border-t mt-auto flex-shrink-0 bg-card space-y-2">
+            <Button onClick={onAutoLayout} className="w-full" variant="secondary">
+              <Wand2 className="mr-2 h-4 w-4" />
+              Auto-Layout
+            </Button>
             <Button onClick={onValidate} className="w-full" variant="secondary">
               <Bot className="mr-2 h-4 w-4" />
               Validate with AI

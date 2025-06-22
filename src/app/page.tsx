@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { type FlowNode, type Input, type NodePosition } from '@/types';
-import { INITIAL_NODES, INITIAL_INPUTS, INITIAL_START_NODE_ID, generateYaml } from '@/lib/flow-utils';
+import { INITIAL_NODES, INITIAL_INPUTS, INITIAL_START_NODE_ID, generateYaml, autoLayout } from '@/lib/flow-utils';
 import { Header } from '@/components/header';
 import { NodePalette } from '@/components/flow/node-palette';
 import { FlowEditor } from '@/components/flow/flow-editor';
@@ -172,6 +172,15 @@ export default function Home() {
     });
   }, [startNodeId, toast]);
 
+  const handleAutoLayout = React.useCallback(() => {
+    const laidOutNodes = autoLayout(nodes, startNodeId);
+    setNodes(laidOutNodes);
+    toast({
+      title: "Auto-Layout Complete",
+      description: "Nodes have been rearranged automatically.",
+    });
+  }, [nodes, startNodeId, toast]);
+
   const handleValidation = React.useCallback(async () => {
     toast({
       title: "Validating Flowchart...",
@@ -229,6 +238,7 @@ export default function Home() {
         </div>
         <SidePanel
           yamlCode={yamlCode}
+          onAutoLayout={handleAutoLayout}
           onValidate={handleValidation}
           selectedNode={selectedNode}
           allNodes={nodes}

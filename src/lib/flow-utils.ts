@@ -128,3 +128,93 @@ export function generateYaml(nodes: FlowNode[], inputs: Input[], startNodeId: st
   // We can decode them for display purposes.
   return decodeURI(yamlString);
 }
+
+export function autoLayout(nodes: FlowNode[], startNodeId: string): FlowNode[] {
+  if (!nodes.length || !nodes.some(n => n.id === startNodeId)) return nodes;
+
+  const LEVEL_HEIGHT = 200; // Vertical distance between levels
+  const NODE_WIDTH = 300;   // Horizontal distance between nodes on the same level
+  const PADDING = 50;       // Padding from the top
+
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+  const levels = new Map<string, number>();
+  const nodesPerLevel = new Map<number, string[]>();
+  const visited = new Set<string>();
+  const queue: string[] = [];
+  
+  // Graph traversal (BFS) to determine levels
+  if (nodeMap.has(startNodeId)) {
+    queue.push(startNodeId);
+    visited.add(startNodeId);
+    levels.set(startNodeId, 0);
+  }
+
+  let head = 0;
+  while(head < queue.length) {
+    const uId = queue[head++];
+    const uNode = nodeMap.get(uId)!;
+    const uLevel = levels.get(uId)!;
+
+    if (!nodesPerLevel.has(uLevel)) {
+      nodesPerLevel.set(uLevel, []);
+    }
+    // Avoid adding duplicates to the same level if there's a loop
+    if (!nodesPerLevel.get(uLevel)!.includes(uId)) {
+        nodesPerLevel.get(uLevel)!.push(uId);
+    }
+
+    const children: string[] = [];
+    if (uNode.type === 'decision') {
+      if (uNode.data.positivePath && nodeMap.has(uNode.data.positivePath)) children.push(uNode.data.positivePath);
+      if (uNode.data.negativePath && nodeMap.has(uNode.data.negativePath)) children.push(uNode.data.negativePath);
+    }
+
+    for (const vId of children) {
+      if (!visited.has(vId)) {
+        visited.add(vId);
+        const vLevel = uLevel + 1;
+        levels.set(vId, vLevel);
+        queue.push(vId);
+      }
+    }
+  }
+
+  // Position nodes that were not reachable from the start node
+  let lastLevel = (nodesPerLevel.size > 0 ? Math.max(...nodesPerLevel.keys()) : -1) + 1;
+  for (const node of nodes) {
+    if (!visited.has(node.id)) {
+      if (!nodesPerLevel.has(lastLevel)) {
+        nodesPerLevel.set(lastLevel, []);
+      }
+      nodesPerLevel.get(lastLevel)!.push(node.id);
+      levels.set(node.id, lastLevel);
+      visited.add(node.id);
+    }
+  }
+
+  // Calculate positions
+  const newNodes = [...nodes];
+  const maxLevelWidth = Math.max(1, ...Array.from(nodesPerLevel.values()).map(levelNodes => levelNodes.length));
+  const canvasWidth = maxLevelWidth * NODE_WIDTH;
+
+  nodesPerLevel.forEach((levelNodes, level) => {
+    const levelY = level * LEVEL_HEIGHT + PADDING;
+    const levelWidth = levelNodes.length * NODE_WIDTH;
+    const startX = (canvasWidth - levelWidth) / 2 + PADDING;
+
+    levelNodes.forEach((nodeId, i) => {
+      const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
+      if (nodeIndex !== -1) {
+        newNodes[nodeIndex] = {
+          ...newNodes[nodeIndex],
+          position: {
+            x: startX + i * NODE_WIDTH,
+            y: levelY,
+          },
+        };
+      }
+    });
+  });
+
+  return newNodes;
+}
