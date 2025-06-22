@@ -231,19 +231,21 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
   
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
   
-    // 1. Assign initial levels with BFS (for a compact layout)
+    // 1. Assign levels to ensure a strict top-to-bottom flow (calculates longest path)
     const levels = new Map<string, number>();
     const queue: { id: string, level: number }[] = [];
     const visited = new Set<string>();
   
+    // Start with a BFS-like approach to get initial levels
     if (nodeMap.has(startNodeId)) {
       queue.push({ id: startNodeId, level: 0 });
       visited.add(startNodeId);
+      levels.set(startNodeId, 0);
     }
   
-    while (queue.length > 0) {
-      const { id, level } = queue.shift()!;
-      levels.set(id, level);
+    let head = 0;
+    while(head < queue.length) {
+      const { id, level } = queue[head++];
       const node = nodeMap.get(id);
   
       if (node?.type === 'decision') {
@@ -251,21 +253,16 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
           .filter(Boolean)
           .forEach(childId => {
             if (!visited.has(childId)) {
-              visited.add(childId);
-              queue.push({ id: childId, level: level + 1 });
+                visited.add(childId);
+                levels.set(childId, level + 1);
+                queue.push({ id: childId, level: level + 1 });
             }
           });
       }
     }
   
-    // Assign a default level for any disconnected nodes
-    nodes.forEach(n => {
-      if (!visited.has(n.id)) {
-        levels.set(n.id, 0);
-      }
-    });
-  
-    // 2. Iteratively fix violations (upward-pointing edges)
+    // Iteratively fix violations to ensure every edge points downwards.
+    // This correctly handles complex DAGs by finding the longest path to each node.
     let changed = true;
     while (changed) {
       changed = false;
@@ -276,9 +273,7 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
             .forEach(vId => {
               const uLevel = levels.get(u.id)!;
               const vLevel = levels.get(vId)!;
-              // If an edge points to an earlier level, it's a violation.
-              // Move the target node down one level.
-              if (uLevel > vLevel) {
+              if (uLevel >= vLevel) {
                 levels.set(vId, uLevel + 1);
                 changed = true;
               }
@@ -286,75 +281,97 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
         }
       });
     }
-  
-    // 3. Position nodes based on calculated levels
+
+    // Assign a default level for any disconnected nodes
+    nodes.forEach(n => {
+        if (!levels.has(n.id)) {
+            levels.set(n.id, 0); 
+        }
+    });
+
+    const newNodes = [...nodes];
+    const positions = new Map<string, { x: number, y: number }>();
+    const PADDING = 50;
     const LEVEL_HEIGHT = 200;
     const NODE_WIDTH = 350;
-    const PADDING = 50;
-  
-    const decisionNodesByLevel = new Map<number, string[]>();
-    const terminatorNodeIds: string[] = [];
-  
-    nodes.forEach(node => {
-      const level = levels.get(node.id);
-      if (level === undefined) return;
-  
-      if (node.type === 'decision') {
-        if (!decisionNodesByLevel.has(level)) {
-          decisionNodesByLevel.set(level, []);
+
+    // Group nodes by their final calculated level
+    const nodesByLevel = new Map<number, string[]>();
+    newNodes.forEach(n => {
+        const level = levels.get(n.id)!;
+        if (!nodesByLevel.has(level)) nodesByLevel.set(level, []);
+        nodesByLevel.get(level)!.push(n.id);
+    });
+
+    // Position terminator nodes first, they form the layout baseline
+    const terminatorNodes = newNodes.filter(n => n.type === 'terminator');
+    terminatorNodes.sort((a,b) => a.id.localeCompare(b.id));
+
+    const decisionNodes = newNodes.filter(n => n.type === 'decision');
+    const decisionLevels = Array.from(new Set(decisionNodes.map(n => levels.get(n.id)!)));
+    const maxDecisionLevel = decisionLevels.length > 0 ? Math.max(...decisionLevels) : -1;
+    const terminatorY = (maxDecisionLevel + 1) * LEVEL_HEIGHT + PADDING;
+    
+    terminatorNodes.forEach((node, i) => {
+        positions.set(node.id, { x: i * NODE_WIDTH + PADDING, y: terminatorY });
+    });
+
+    // Position decision nodes bottom-up
+    const sortedDecisionLevels = decisionLevels.sort((a,b) => b-a);
+    for (const level of sortedDecisionLevels) {
+        const levelNodes = nodesByLevel.get(level)!.filter(id => nodeMap.get(id)?.type === 'decision');
+        for (const nodeId of levelNodes) {
+            if (positions.has(nodeId)) continue;
+            
+            const node = nodeMap.get(nodeId) as DecisionNode;
+            const childrenIds = [node.data.positivePath, node.data.negativePath].filter(id => id && positions.has(id));
+            
+            let x;
+            if (childrenIds.length > 0) {
+                const childPositions = childrenIds.map(id => positions.get(id)!);
+                x = childPositions.reduce((sum, pos) => sum + pos.x, 0) / childPositions.length;
+            } else {
+                // If no positioned children, find a gap.
+                const nodesOnLevel = nodesByLevel.get(level)!;
+                const nodeIndex = nodesOnLevel.indexOf(nodeId);
+                x = nodeIndex * NODE_WIDTH + PADDING; 
+            }
+            positions.set(nodeId, { x, y: level * LEVEL_HEIGHT + PADDING });
         }
-        decisionNodesByLevel.get(level)!.push(node.id);
-      } else {
-        terminatorNodeIds.push(node.id);
+    }
+  
+    // Resolve overlaps by spreading nodes on each level
+    const allLevels = Array.from(nodesByLevel.keys()).sort((a,b) => a-b);
+    for (const level of allLevels) {
+        const levelNodeIds = nodesByLevel.get(level)!;
+        const levelPositions = levelNodeIds.map(id => ({ id, pos: positions.get(id)! })).filter(item => item.pos);
+        levelPositions.sort((a, b) => a.pos.x - b.pos.x);
+        
+        for (let i = 0; i < levelPositions.length - 1; i++) {
+            const nodeA = levelPositions[i];
+            const nodeB = levelPositions[i+1];
+            const distance = nodeB.pos.x - nodeA.pos.x;
+            if (distance < NODE_WIDTH) {
+                const shift = (NODE_WIDTH - distance) / 2;
+                nodeA.pos.x -= shift;
+                nodeB.pos.x += shift;
+            }
+        }
+        // Re-center the whole level after spreading
+        const totalWidth = levelPositions.length > 0 ? levelPositions[levelPositions.length-1].pos.x - levelPositions[0].pos.x : 0;
+        const currentCenter = totalWidth / 2 + (levelPositions[0]?.pos.x || 0);
+        const canvasCenter = (terminatorNodes.length * NODE_WIDTH) / 2;
+        const shift = canvasCenter - currentCenter;
+
+        levelPositions.forEach(item => item.pos.x += shift);
+    }
+    
+    // Assign final positions
+    newNodes.forEach(node => {
+      if (positions.has(node.id)) {
+        node.position = positions.get(node.id)!;
       }
     });
-  
-    const newNodes = [...nodes];
-      
-    const maxNodesOnDecisionLevel = decisionNodesByLevel.size > 0 
-      ? Math.max(0, ...Array.from(decisionNodesByLevel.values()).map(levelNodes => levelNodes.length))
-      : 0;
-    const canvasWidth = Math.max(maxNodesOnDecisionLevel, terminatorNodeIds.length) * NODE_WIDTH;
-  
-    const sortedLevels = Array.from(decisionNodesByLevel.keys()).sort((a, b) => a - b);
-      
-    sortedLevels.forEach(level => {
-      const levelNodeIds = decisionNodesByLevel.get(level)!;
-      levelNodeIds.sort((a, b) => a.localeCompare(b));
-  
-      const levelY = level * LEVEL_HEIGHT + PADDING;
-      const levelWidth = levelNodeIds.length * NODE_WIDTH;
-      const startX = (canvasWidth - levelWidth) / 2 + PADDING;
-  
-      levelNodeIds.forEach((nodeId, i) => {
-        const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
-        if (nodeIndex !== -1) {
-          newNodes[nodeIndex].position = {
-            x: startX + i * NODE_WIDTH,
-            y: levelY,
-          };
-        }
-      });
-    });
-  
-    if (terminatorNodeIds.length > 0) {
-      const terminatorLevel = (sortedLevels.length > 0 ? sortedLevels[sortedLevels.length - 1] : -1) + 1;
-      const levelY = terminatorLevel * LEVEL_HEIGHT + PADDING;
-      const levelWidth = terminatorNodeIds.length * NODE_WIDTH;
-      const startX = (canvasWidth - levelWidth) / 2 + PADDING;
-  
-      terminatorNodeIds.sort((a,b) => a.localeCompare(b));
-  
-      terminatorNodeIds.forEach((nodeId, i) => {
-        const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
-        if (nodeIndex !== -1) {
-          newNodes[nodeIndex].position = {
-            x: startX + i * NODE_WIDTH,
-            y: levelY,
-          };
-        }
-      });
-    }
   
     return newNodes;
   }
