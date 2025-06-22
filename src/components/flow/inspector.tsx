@@ -8,14 +8,18 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Trash2 } from 'lucide-react';
 
 interface InspectorProps {
   node: FlowNode;
   allNodes: FlowNode[];
   onUpdate: (nodeId: string, data: any) => void;
+  onDelete: (nodeId: string) => void;
+  isStartNode: boolean;
 }
 
-export function Inspector({ node, allNodes, onUpdate }: InspectorProps) {
+export function Inspector({ node, allNodes, onUpdate, onDelete, isStartNode }: InspectorProps) {
   const [formData, setFormData] = React.useState(node.data);
 
   React.useEffect(() => {
@@ -85,16 +89,38 @@ export function Inspector({ node, allNodes, onUpdate }: InspectorProps) {
   );
 
   return (
-    <Card className="h-full border-none shadow-none rounded-none">
+    <Card className="h-full border-none shadow-none rounded-none flex flex-col">
       <CardHeader>
         <CardTitle>Inspector</CardTitle>
         <CardDescription>Editing node: <span className="font-bold text-primary">{node.id}</span></CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex-grow overflow-y-auto space-y-4 pr-2">
         {node.type === 'decision' && renderDecisionForm(formData as DecisionNodeData)}
         {node.type === 'terminator' && renderTerminatorForm(formData as TerminatorNodeData)}
-        <Button onClick={handleSave} className="w-full">Save Changes</Button>
       </CardContent>
+      <div className="p-6 pt-0 mt-auto flex-shrink-0 space-y-2">
+        <Button onClick={handleSave} className="w-full">Save Changes</Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" className="w-full" disabled={isStartNode} title={isStartNode ? "Cannot delete the start node" : "Delete Node"}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Node
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the node "{node.id}" and remove any connections to it.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onDelete(node.id)}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </Card>
   );
 }

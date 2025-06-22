@@ -15,11 +15,13 @@ interface SidePanelProps {
   selectedNode: FlowNode | undefined;
   allNodes: FlowNode[];
   onUpdateNode: (nodeId: string, data: any) => void;
+  onDeleteNode: (nodeId: string) => void;
+  startNodeId: string;
   inputs: Input[];
   onUpdateInputs: (inputs: Input[]) => void;
 }
 
-export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onUpdateNode, inputs, onUpdateInputs }: SidePanelProps) {
+export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onUpdateNode, onDeleteNode, startNodeId, inputs, onUpdateInputs }: SidePanelProps) {
   const [activeTab, setActiveTab] = React.useState('yaml');
 
   React.useEffect(() => {
@@ -69,7 +71,13 @@ export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onUpda
 
         <TabsContent value="inspector" className="flex-1 overflow-auto m-0">
           {selectedNode ? (
-            <Inspector node={selectedNode} allNodes={allNodes} onUpdate={onUpdateNode} />
+            <Inspector 
+              node={selectedNode} 
+              allNodes={allNodes} 
+              onUpdate={onUpdateNode}
+              onDelete={onDeleteNode}
+              isStartNode={selectedNode.id === startNodeId}
+            />
           ) : (
             <div className="p-4 text-center text-muted-foreground">Select a node to inspect its properties.</div>
           )}

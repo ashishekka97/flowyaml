@@ -70,6 +70,41 @@ export default function Home() {
     setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, data } : n));
   }, []);
   
+  const deleteNode = React.useCallback((nodeId: string) => {
+    if (nodeId === startNodeId) {
+      toast({
+        variant: "destructive",
+        title: "Cannot delete start node",
+        description: "The start node is essential for the flowchart.",
+      });
+      return;
+    }
+
+    setNodes(prev => {
+      const newNodes = prev.filter(n => n.id !== nodeId);
+      return newNodes.map(n => {
+        if (n.type === 'decision') {
+          const data = { ...n.data };
+          if (data.positivePath === nodeId) {
+            data.positivePath = '';
+          }
+          if (data.negativePath === nodeId) {
+            data.negativePath = '';
+          }
+          return { ...n, data };
+        }
+        return n;
+      });
+    });
+
+    setSelectedNodeId(null);
+
+    toast({
+      title: "Node Deleted",
+      description: `Node "${nodeId}" has been removed.`,
+    });
+  }, [startNodeId, toast]);
+
   const handleValidation = React.useCallback(async () => {
     toast({
       title: "Validating Flowchart...",
@@ -117,6 +152,8 @@ export default function Home() {
           selectedNode={selectedNode}
           allNodes={nodes}
           onUpdateNode={updateNodeData}
+          onDeleteNode={deleteNode}
+          startNodeId={startNodeId}
           inputs={inputs}
           onUpdateInputs={setInputs}
         />
