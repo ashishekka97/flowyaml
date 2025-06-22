@@ -4,6 +4,8 @@ import React from 'react';
 import { type FlowNode, type NodePosition } from '@/types';
 import { FlowNodeComponent } from './flow-node';
 import { ConnectorLine } from './connector-line';
+import { Button } from '@/components/ui/button';
+import { Plus, Minus } from 'lucide-react';
 
 interface FlowEditorProps {
   nodes: FlowNode[];
@@ -11,9 +13,11 @@ interface FlowEditorProps {
   selectedNodeId: string | null;
   onNodeClick: (id: string, e: React.MouseEvent) => void;
   onNodeDragStart: (id:string, e: React.MouseEvent) => void;
+  zoom: number;
+  onZoomChange: (newZoom: number) => void;
 }
 
-export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, onNodeDragStart }: FlowEditorProps) {
+export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, onNodeDragStart, zoom, onZoomChange }: FlowEditorProps) {
   const nodeElements = React.useMemo(() => (
     nodes.map(node => (
       <FlowNodeComponent
@@ -62,7 +66,12 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
     <div className="relative w-full h-full bg-background overflow-auto">
       <div
         className="relative"
-        style={{ width: canvasWidth, height: canvasHeight }}
+        style={{
+          width: canvasWidth,
+          height: canvasHeight,
+          transform: `scale(${zoom})`,
+          transformOrigin: 'top left',
+        }}
       >
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] bg-[size:40px_40px]"></div>
         
@@ -75,6 +84,17 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
         <div className="relative w-full h-full">
           {nodeElements}
         </div>
+      </div>
+      <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2">
+        <Button size="icon" variant="outline" onClick={() => onZoomChange(zoom - 0.1)}>
+            <Minus className="h-4 w-4" />
+        </Button>
+        <div className="bg-card border w-20 text-center text-sm font-medium rounded-md py-1.5 tabular-nums">
+            {Math.round(zoom * 100)}%
+        </div>
+        <Button size="icon" variant="outline" onClick={() => onZoomChange(zoom + 0.1)}>
+            <Plus className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );

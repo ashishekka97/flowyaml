@@ -15,9 +15,10 @@ export default function Home() {
   const [nodes, setNodes] = React.useState<FlowNode[]>(INITIAL_NODES);
   const [inputs, setInputs] = React.useState<Input[]>(INITIAL_INPUTS);
   const [startNodeId, setStartNodeId] = React.useState<string>(INITIAL_START_NODE_ID);
+  const [zoom, setZoom] = React.useState(1);
 
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
-  const [draggedNode, setDraggedNode] = React.useState<{ id: string; offset: NodePosition } | null>(null);
+  const [draggedNode, setDraggedNode] = React.useState<{ id: string; startPos: NodePosition; startMouse: NodePosition } | null>(null);
 
   const yamlCode = React.useMemo(() => generateYaml(nodes, inputs, startNodeId), [nodes, inputs, startNodeId]);
 
@@ -33,28 +34,29 @@ export default function Home() {
   const handleNodeDragStart = React.useCallback((id: string, e: React.MouseEvent) => {
     const node = nodes.find(n => n.id === id);
     if (!node) return;
+    e.stopPropagation();
     document.body.style.cursor = 'grabbing';
     setDraggedNode({
       id,
-      offset: {
-        x: e.clientX - node.position.x,
-        y: e.clientY - node.position.y,
-      },
+      startPos: node.position,
+      startMouse: { x: e.clientX, y: e.clientY },
     });
   }, [nodes]);
 
   const handleNodeDrag = React.useCallback((e: React.MouseEvent) => {
     if (!draggedNode) return;
+    const dx = (e.clientX - draggedNode.startMouse.x) / zoom;
+    const dy = (e.clientY - draggedNode.startMouse.y) / zoom;
     const newPosition = {
-      x: e.clientX - draggedNode.offset.x,
-      y: e.clientY - draggedNode.offset.y,
+      x: draggedNode.startPos.x + dx,
+      y: draggedNode.startPos.y + dy,
     };
     setNodes(prevNodes =>
       prevNodes.map(n =>
         n.id === draggedNode.id ? { ...n, position: newPosition } : n
       )
     );
-  }, [draggedNode]);
+  }, [draggedNode, zoom]);
 
   const handleNodeDragEnd = React.useCallback(() => {
     document.body.style.cursor = 'default';
@@ -195,6 +197,18 @@ export default function Home() {
     }
   }, [yamlCode, toast]);
 
+  const handleZoomChange = React.useCallback((newZoom: number) => {
+    setZoom(Math.min(Math.max(newZoom, 0.2), 2));
+  }, []);
+
+  const handleWheel = React.useCallback((e: React.WheelEvent) => {
+    if (e.ctrlKey) {
+        e.preventDefault();
+        const newZoom = zoom - e.deltaY * 0.001;
+        handleZoomChange(newZoom);
+    }
+  }, [zoom, handleZoomChange]);
+
   const selectedNode = React.useMemo(() => nodes.find(n => n.id === selectedNodeId), [nodes, selectedNodeId]);
 
   return (
@@ -202,13 +216,15 @@ export default function Home() {
       <Header />
       <main className="flex flex-1 overflow-hidden">
         <NodePalette onAddNode={addNode} />
-        <div className="flex-1 h-full min-w-0" onMouseMove={handleNodeDrag} onMouseUp={handleNodeDragEnd} onClick={handleCanvasClick}>
+        <div className="flex-1 h-full min-w-0" onMouseMove={handleNodeDrag} onMouseUp={handleNodeDragEnd} onClick={handleCanvasClick} onWheel={handleWheel}>
           <FlowEditor
             nodes={nodes}
             startNodeId={startNodeId}
             selectedNodeId={selectedNodeId}
             onNodeClick={handleNodeClick}
             onNodeDragStart={handleNodeDragStart}
+            zoom={zoom}
+            onZoomChange={handleZoomChange}
           />
         </div>
         <SidePanel
