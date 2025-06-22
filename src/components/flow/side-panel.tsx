@@ -93,9 +93,11 @@ export function SidePanel({ yamlCode, onAutoLayout, onValidate, onLoadYaml, sele
         </CardHeader>
         
         <TabsContent value="yaml" className="flex-1 m-0 overflow-y-auto">
-           <pre className="text-xs p-4 bg-gray-900 text-white font-mono whitespace-pre-wrap break-all">
-             <code>{yamlCode}</code>
-           </pre>
+           <div className="bg-gray-900 h-full">
+            <pre className="text-xs p-4 text-white font-mono whitespace-pre-wrap break-all">
+                <code>{yamlCode}</code>
+            </pre>
+           </div>
         </TabsContent>
 
         <TabsContent value="inputs" className="flex-1 m-0 overflow-y-auto">
@@ -116,7 +118,7 @@ export function SidePanel({ yamlCode, onAutoLayout, onValidate, onLoadYaml, sele
           )}
         </TabsContent>
         
-        <div className="p-4 border-t mt-auto flex-shrink-0 bg-card space-y-2">
+        <div className="p-4 border-t flex-shrink-0 bg-card space-y-2">
             <Button onClick={onAutoLayout} className="w-full" variant="secondary">
               <Wand2 className="mr-2 h-4 w-4" />
               Auto-Layout
