@@ -202,7 +202,7 @@ export default function Home() {
       <Header />
       <main className="flex flex-1 overflow-hidden">
         <NodePalette onAddNode={addNode} />
-        <div className="flex-1 h-full" onMouseMove={handleNodeDrag} onMouseUp={handleNodeDragEnd} onClick={handleCanvasClick}>
+        <div className="flex-1 h-full min-w-0" onMouseMove={handleNodeDrag} onMouseUp={handleNodeDragEnd} onClick={handleCanvasClick}>
           <FlowEditor
             nodes={nodes}
             startNodeId={startNodeId}
