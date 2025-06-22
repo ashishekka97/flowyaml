@@ -21,6 +21,15 @@ export default function Home() {
 
   const yamlCode = React.useMemo(() => generateYaml(nodes, inputs, startNodeId), [nodes, inputs, startNodeId]);
 
+  const handleNodeClick = React.useCallback((id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedNodeId(id);
+  }, []);
+
+  const handleCanvasClick = React.useCallback(() => {
+    setSelectedNodeId(null);
+  }, []);
+
   const handleNodeDragStart = React.useCallback((id: string, e: React.MouseEvent) => {
     const node = nodes.find(n => n.id === id);
     if (!node) return;
@@ -137,12 +146,12 @@ export default function Home() {
       <Header />
       <main className="flex flex-1 overflow-hidden">
         <NodePalette onAddNode={addNode} />
-        <div className="flex-1 h-full" onMouseMove={handleNodeDrag} onMouseUp={handleNodeDragEnd}>
+        <div className="flex-1 h-full" onMouseMove={handleNodeDrag} onMouseUp={handleNodeDragEnd} onClick={handleCanvasClick}>
           <FlowEditor
             nodes={nodes}
             startNodeId={startNodeId}
             selectedNodeId={selectedNodeId}
-            onNodeClick={setSelectedNodeId}
+            onNodeClick={handleNodeClick}
             onNodeDragStart={handleNodeDragStart}
           />
         </div>

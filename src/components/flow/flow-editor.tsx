@@ -10,7 +10,7 @@ interface FlowEditorProps {
   nodes: FlowNode[];
   startNodeId: string;
   selectedNodeId: string | null;
-  onNodeClick: (id: string) => void;
+  onNodeClick: (id: string, e: React.MouseEvent) => void;
   onNodeDragStart: (id:string, e: React.MouseEvent) => void;
 }
 
@@ -22,7 +22,7 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
         node={node}
         isStart={node.id === startNodeId}
         isSelected={node.id === selectedNodeId}
-        onClick={() => onNodeClick(node.id)}
+        onClick={(e) => onNodeClick(node.id, e)}
         onMouseDown={(e) => onNodeDragStart(node.id, e)}
       />
     ))
