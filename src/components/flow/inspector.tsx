@@ -99,7 +99,7 @@ export function Inspector({ node, allNodes, onSave, onDelete, isStartNode }: Ins
         <CardTitle>Inspector</CardTitle>
         <CardDescription>Editing node: <span className="font-bold text-primary">{node.id}</span></CardDescription>
       </CardHeader>
-      <CardContent className="flex-grow overflow-y-auto space-y-4 pr-2">
+      <CardContent className="overflow-y-auto space-y-4 pr-2">
         <div className="space-y-2">
           <Label htmlFor="node-id">Node ID</Label>
           <Input id="node-id" value={id} onChange={(e) => setId(e.target.value)} placeholder="Enter a unique node ID" />
@@ -107,7 +107,7 @@ export function Inspector({ node, allNodes, onSave, onDelete, isStartNode }: Ins
         {node.type === 'decision' && renderDecisionForm(formData as DecisionNodeData)}
         {node.type === 'terminator' && renderTerminatorForm(formData as TerminatorNodeData)}
       </CardContent>
-      <div className="p-6 pt-0 mt-auto flex-shrink-0 space-y-2">
+      <div className="p-6 pt-0 flex-shrink-0 space-y-2">
         <Button onClick={handleSave} className="w-full">Save Changes</Button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
