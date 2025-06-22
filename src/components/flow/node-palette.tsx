@@ -12,12 +12,12 @@ interface NodePaletteProps {
 
 export function NodePalette({ onAddNode }: NodePaletteProps) {
   return (
-    <Card className="w-64 h-full border-r rounded-none shadow-none">
-      <CardHeader>
+    <Card className="w-64 h-full border-r rounded-none shadow-none flex flex-col">
+      <CardHeader className="flex-shrink-0">
         <CardTitle>Nodes</CardTitle>
       </CardHeader>
       <Separator />
-      <CardContent className="p-4 space-y-4">
+      <CardContent className="p-4 space-y-4 overflow-y-auto flex-1">
         <p className="text-sm text-muted-foreground">Drag or click to add nodes.</p>
         <Button
           variant="outline"

@@ -8,6 +8,7 @@ import { Download, Bot } from 'lucide-react';
 import { type FlowNode, type Input } from '@/types';
 import { Inspector } from './inspector';
 import { InputConfigurator } from './input-configurator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface SidePanelProps {
   yamlCode: string;
@@ -57,15 +58,17 @@ export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onSave
           </TabsList>
         </CardHeader>
         
-        <TabsContent value="yaml" className="flex-1 flex flex-col overflow-hidden m-0">
-           <CardContent className="flex-1 overflow-auto p-0">
-             <pre className="text-xs p-4 h-full bg-gray-900 text-white font-mono whitespace-pre-wrap break-all">
-               <code>{yamlCode}</code>
-             </pre>
+        <TabsContent value="yaml" className="flex-1 flex flex-col m-0">
+           <CardContent className="flex-1 p-0">
+             <ScrollArea className="h-full">
+               <pre className="text-xs p-4 bg-gray-900 text-white font-mono whitespace-pre-wrap break-all">
+                 <code>{yamlCode}</code>
+               </pre>
+             </ScrollArea>
            </CardContent>
         </TabsContent>
 
-        <TabsContent value="inputs" className="flex-1 overflow-auto m-0">
+        <TabsContent value="inputs" className="flex-1 flex flex-col m-0">
           <InputConfigurator inputs={inputs} onUpdateInputs={onUpdateInputs} />
         </TabsContent>
 

@@ -4,7 +4,6 @@ import React from 'react';
 import { type FlowNode, type NodePosition } from '@/types';
 import { FlowNodeComponent } from './flow-node';
 import { ConnectorLine } from './connector-line';
-import { cn } from '@/lib/utils';
 
 interface FlowEditorProps {
   nodes: FlowNode[];
@@ -56,16 +55,26 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
     return lines;
   }, [nodes]);
 
+  const canvasWidth = 4000;
+  const canvasHeight = 4000;
+
   return (
-    <div className="relative w-full h-full bg-background overflow-hidden">
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]"></div>
-      
-      <svg className="absolute w-full h-full pointer-events-none">
-        {connectors}
-      </svg>
-      
-      <div className="relative w-full h-full">
-        {nodeElements}
+    <div className="relative w-full h-full bg-background overflow-auto">
+      <div
+        className="relative"
+        style={{ width: canvasWidth, height: canvasHeight }}
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+        
+        <svg
+          className="absolute w-full h-full pointer-events-none"
+        >
+          {connectors}
+        </svg>
+        
+        <div className="relative w-full h-full">
+          {nodeElements}
+        </div>
       </div>
     </div>
   );
