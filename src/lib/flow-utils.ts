@@ -231,77 +231,63 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
   
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
   
-    // 1. Calculate in-degrees for topological sort
-    const inDegrees = new Map<string, number>();
-    nodes.forEach(n => inDegrees.set(n.id, 0));
+    // 1. Assign initial levels with BFS (for a compact layout)
+    const levels = new Map<string, number>();
+    const queue: { id: string, level: number }[] = [];
+    const visited = new Set<string>();
   
-    nodes.forEach(node => {
-      if (node.type === 'decision') {
-        const { positivePath, negativePath } = node.data;
-        if (positivePath && inDegrees.has(positivePath)) {
-          inDegrees.set(positivePath, (inDegrees.get(positivePath) || 0) + 1);
-        }
-        if (negativePath && inDegrees.has(negativePath)) {
-          inDegrees.set(negativePath, (inDegrees.get(negativePath) || 0) + 1);
-        }
-      }
-    });
+    if (nodeMap.has(startNodeId)) {
+      queue.push({ id: startNodeId, level: 0 });
+      visited.add(startNodeId);
+    }
   
-    // 2. Perform topological sort (Kahn's algorithm)
-    const queue: string[] = [];
-    nodes.forEach(node => {
-      if (inDegrees.get(node.id) === 0) {
-        queue.push(node.id);
-      }
-    });
-  
-    const sortedNodeIds: string[] = [];
     while (queue.length > 0) {
-      // Using sort to make layout more deterministic
-      queue.sort((a,b) => a.localeCompare(b));
-      const uId = queue.shift()!;
-      sortedNodeIds.push(uId);
-      
-      const uNode = nodeMap.get(uId)!;
-      if (uNode.type === 'decision') {
-        [uNode.data.negativePath, uNode.data.positivePath]
-          .filter(id => id && nodeMap.has(id))
-          .forEach(vId => {
-            const newDegree = (inDegrees.get(vId) || 1) - 1;
-            inDegrees.set(vId, newDegree);
-            if (newDegree === 0) {
-              queue.push(vId);
+      const { id, level } = queue.shift()!;
+      levels.set(id, level);
+      const node = nodeMap.get(id);
+  
+      if (node?.type === 'decision') {
+        [node.data.negativePath, node.data.positivePath]
+          .filter(Boolean)
+          .forEach(childId => {
+            if (!visited.has(childId)) {
+              visited.add(childId);
+              queue.push({ id: childId, level: level + 1 });
             }
           });
       }
     }
   
-    // Handle cycles or unreachable nodes by just appending them
-    if (sortedNodeIds.length < nodes.length) {
-      nodes.forEach(node => {
-        if (!sortedNodeIds.includes(node.id)) {
-          sortedNodeIds.push(node.id);
+    // Assign a default level for any disconnected nodes
+    nodes.forEach(n => {
+      if (!visited.has(n.id)) {
+        levels.set(n.id, 0);
+      }
+    });
+  
+    // 2. Iteratively fix violations (upward-pointing edges)
+    let changed = true;
+    while (changed) {
+      changed = false;
+      nodes.forEach(u => {
+        if (u.type === 'decision') {
+          [u.data.negativePath, u.data.positivePath]
+            .filter(vId => vId && nodeMap.has(vId))
+            .forEach(vId => {
+              const uLevel = levels.get(u.id)!;
+              const vLevel = levels.get(vId)!;
+              // If an edge goes from a higher level to a lower level, it's a violation.
+              // Move the lower-level node down to the same level as the higher one.
+              if (uLevel > vLevel) {
+                levels.set(vId, uLevel);
+                changed = true;
+              }
+            });
         }
       });
     }
   
-    // 3. Calculate levels based on the longest path from a source
-    const levels = new Map<string, number>();
-    nodes.forEach(n => levels.set(n.id, 0));
-  
-    sortedNodeIds.forEach(uId => {
-      const uNode = nodeMap.get(uId)!;
-      const uLevel = levels.get(uId)!;
-      if (uNode.type === 'decision') {
-        [uNode.data.negativePath, uNode.data.positivePath]
-          .filter(id => id && nodeMap.has(id))
-          .forEach(vId => {
-            levels.set(vId, Math.max(levels.get(vId)!, uLevel + 1));
-          });
-      }
-    });
-  
-    // 4. Position nodes based on calculated levels
+    // 3. Position nodes based on calculated levels
     const LEVEL_HEIGHT = 200;
     const NODE_WIDTH = 300;
     const PADDING = 50;
