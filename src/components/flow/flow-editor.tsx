@@ -45,11 +45,7 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
           const fromPos: NodePosition = { x: sourceNode.position.x, y: sourceNode.position.y + 50 };
           
           let toPos: NodePosition;
-          if (negativeTargetNode.type === 'decision') {
-            toPos = { x: negativeTargetNode.position.x + 100, y: negativeTargetNode.position.y };
-          } else { // terminator
-            toPos = { x: negativeTargetNode.position.x + 100, y: negativeTargetNode.position.y };
-          }
+          toPos = { x: negativeTargetNode.position.x + 100, y: negativeTargetNode.position.y };
           
           lines.push(<ConnectorLine key={`${node.id}-neg`} from={fromPos} to={toPos} isPositive={false} />);
         }
@@ -58,11 +54,7 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
           const fromPos: NodePosition = { x: sourceNode.position.x + 200, y: sourceNode.position.y + 50 };
 
           let toPos: NodePosition;
-          if (positiveTargetNode.type === 'decision') {
-            toPos = { x: positiveTargetNode.position.x + 100, y: positiveTargetNode.position.y };
-          } else { // terminator
-            toPos = { x: positiveTargetNode.position.x + 100, y: positiveTargetNode.position.y };
-          }
+          toPos = { x: positiveTargetNode.position.x + 100, y: positiveTargetNode.position.y };
 
           lines.push(<ConnectorLine key={`${node.id}-pos`} from={fromPos} to={toPos} isPositive />);
         }
@@ -75,26 +67,28 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
   const canvasHeight = 4000;
 
   return (
-    <div className="relative w-full h-full bg-background overflow-auto">
-      <div
-        className="relative"
-        style={{
-          width: canvasWidth,
-          height: canvasHeight,
-          transform: `scale(${zoom})`,
-          transformOrigin: 'top left',
-        }}
-      >
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] bg-[size:40px_40px]"></div>
-        
-        <svg
-          className="absolute w-full h-full pointer-events-none"
+    <div className="relative w-full h-full">
+      <div className="w-full h-full bg-background overflow-auto">
+        <div
+          className="relative"
+          style={{
+            width: canvasWidth,
+            height: canvasHeight,
+            transform: `scale(${zoom})`,
+            transformOrigin: 'top left',
+          }}
         >
-          {connectors}
-        </svg>
-        
-        <div className="relative w-full h-full">
-          {nodeElements}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+          
+          <svg
+            className="absolute w-full h-full pointer-events-none"
+          >
+            {connectors}
+          </svg>
+          
+          <div className="relative w-full h-full">
+            {nodeElements}
+          </div>
         </div>
       </div>
       <div className="absolute bottom-4 right-4 z-10 flex items-center gap-2">
