@@ -21,7 +21,7 @@ class TerminatorFlowData {
 }
 
 // Define custom YAML types for js-yaml
-const DecisionYamlType = new yaml.Type('!decision', {
+const DecisionYamlType = new yaml.Type('!<decision>', {
   kind: 'mapping',
   instanceOf: DecisionFlowData,
   construct: (data: any): DecisionFlowData => {
@@ -41,7 +41,7 @@ const DecisionYamlType = new yaml.Type('!decision', {
   },
 });
 
-const TerminatorYamlType = new yaml.Type('!terminator', {
+const TerminatorYamlType = new yaml.Type('!<terminator>', {
   kind: 'mapping',
   instanceOf: TerminatorFlowData,
   construct: (data: any): TerminatorFlowData => {
