@@ -15,15 +15,17 @@ import * as yaml from 'js-yaml';
 interface InspectorProps {
   node: FlowNode;
   allNodes: FlowNode[];
-  onUpdate: (nodeId: string, data: any) => void;
+  onSave: (oldId: string, newId: string, data: any) => void;
   onDelete: (nodeId: string) => void;
   isStartNode: boolean;
 }
 
-export function Inspector({ node, allNodes, onUpdate, onDelete, isStartNode }: InspectorProps) {
+export function Inspector({ node, allNodes, onSave, onDelete, isStartNode }: InspectorProps) {
+  const [id, setId] = React.useState(node.id);
   const [formData, setFormData] = React.useState(node.data);
 
   React.useEffect(() => {
+    setId(node.id);
     setFormData(node.data);
   }, [node]);
 
@@ -37,7 +39,7 @@ export function Inspector({ node, allNodes, onUpdate, onDelete, isStartNode }: I
   };
 
   const handleSave = () => {
-    onUpdate(node.id, formData);
+    onSave(node.id, id, formData);
   };
   
   const otherNodes = allNodes.filter(n => n.id !== node.id);
@@ -98,6 +100,10 @@ export function Inspector({ node, allNodes, onUpdate, onDelete, isStartNode }: I
         <CardDescription>Editing node: <span className="font-bold text-primary">{node.id}</span></CardDescription>
       </CardHeader>
       <CardContent className="flex-grow overflow-y-auto space-y-4 pr-2">
+        <div className="space-y-2">
+          <Label htmlFor="node-id">Node ID</Label>
+          <Input id="node-id" value={id} onChange={(e) => setId(e.target.value)} placeholder="Enter a unique node ID" />
+        </div>
         {node.type === 'decision' && renderDecisionForm(formData as DecisionNodeData)}
         {node.type === 'terminator' && renderTerminatorForm(formData as TerminatorNodeData)}
       </CardContent>

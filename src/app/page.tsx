@@ -75,9 +75,65 @@ export default function Home() {
     setSelectedNodeId(newNodeId);
   }, []);
 
-  const updateNodeData = React.useCallback((nodeId: string, data: any) => {
-    setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, data } : n));
-  }, []);
+  const handleNodeSave = React.useCallback((oldId: string, newId: string, data: any) => {
+    if (newId.trim() === '') {
+      toast({
+        variant: "destructive",
+        title: "Invalid ID",
+        description: "Node ID cannot be empty.",
+      });
+      return;
+    }
+
+    if (newId !== oldId && nodes.some(n => n.id === newId)) {
+      toast({
+        variant: "destructive",
+        title: "ID already in use",
+        description: `A node with the ID "${newId}" already exists.`,
+      });
+      return;
+    }
+
+    setNodes(prevNodes => {
+      let newNodes = prevNodes.map(n => {
+        if (n.id === oldId) {
+          return { ...n, id: newId, data };
+        }
+        return n;
+      });
+
+      if (newId !== oldId) {
+        newNodes = newNodes.map(n => {
+          if (n.type === 'decision') {
+            const nodeData = { ...n.data };
+            let changed = false;
+            if (nodeData.positivePath === oldId) {
+              nodeData.positivePath = newId;
+              changed = true;
+            }
+            if (nodeData.negativePath === oldId) {
+              nodeData.negativePath = newId;
+              changed = true;
+            }
+            return changed ? { ...n, data: nodeData } : n;
+          }
+          return n;
+        });
+      }
+      return newNodes;
+    });
+
+    if (startNodeId === oldId) {
+      setStartNodeId(newId);
+    }
+
+    setSelectedNodeId(newId);
+
+    toast({
+      title: "Node Updated",
+      description: `Node "${oldId}" has been updated successfully.`,
+    });
+  }, [nodes, startNodeId, toast]);
   
   const deleteNode = React.useCallback((nodeId: string) => {
     if (nodeId === startNodeId) {
@@ -160,7 +216,7 @@ export default function Home() {
           onValidate={handleValidation}
           selectedNode={selectedNode}
           allNodes={nodes}
-          onUpdateNode={updateNodeData}
+          onSaveNode={handleNodeSave}
           onDeleteNode={deleteNode}
           startNodeId={startNodeId}
           inputs={inputs}

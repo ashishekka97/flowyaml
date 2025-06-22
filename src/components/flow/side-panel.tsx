@@ -14,14 +14,14 @@ interface SidePanelProps {
   onValidate: () => void;
   selectedNode: FlowNode | undefined;
   allNodes: FlowNode[];
-  onUpdateNode: (nodeId: string, data: any) => void;
+  onSaveNode: (oldId: string, newId: string, data: any) => void;
   onDeleteNode: (nodeId: string) => void;
   startNodeId: string;
   inputs: Input[];
   onUpdateInputs: (inputs: Input[]) => void;
 }
 
-export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onUpdateNode, onDeleteNode, startNodeId, inputs, onUpdateInputs }: SidePanelProps) {
+export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onSaveNode, onDeleteNode, startNodeId, inputs, onUpdateInputs }: SidePanelProps) {
   const [activeTab, setActiveTab] = React.useState('yaml');
 
   React.useEffect(() => {
@@ -74,7 +74,7 @@ export function SidePanel({ yamlCode, onValidate, selectedNode, allNodes, onUpda
             <Inspector 
               node={selectedNode} 
               allNodes={allNodes} 
-              onUpdate={onUpdateNode}
+              onSave={onSaveNode}
               onDelete={onDeleteNode}
               isStartNode={selectedNode.id === startNodeId}
             />
