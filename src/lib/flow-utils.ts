@@ -124,5 +124,7 @@ export function generateYaml(nodes: FlowNode[], inputs: Input[], startNodeId: st
   // The !!map part is still needed if nodes is empty
   yamlString = yamlString.replace("nodes: {}", "nodes: !!map");
   
-  return yamlString;
+  // The dumper can sometimes URL-encode special characters.
+  // We can decode them for display purposes.
+  return decodeURI(yamlString);
 }
