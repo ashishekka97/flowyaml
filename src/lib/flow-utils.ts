@@ -233,146 +233,112 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
     const newNodes = [...nodes];
     const positions = new Map<string, { x: number, y: number }>();
     const PADDING = 50;
-    const LEVEL_HEIGHT = 200;
-    const NODE_WIDTH = 350;
+    const LEVEL_HEIGHT = 180;
+    const NODE_WIDTH = 250;
   
-    // 1. Assign levels to ensure a strict top-to-bottom flow (calculates longest path)
-    const levels = new Map<string, number>();
-    const queue: { id: string, level: number }[] = [];
-    const visited = new Set<string>();
-  
-    // Start with a BFS-like approach to get initial levels
-    if (nodeMap.has(startNodeId)) {
-      queue.push({ id: startNodeId, level: 0 });
-      visited.add(startNodeId);
-      levels.set(startNodeId, 0);
-    }
-  
-    let head = 0;
-    while(head < queue.length) {
-      const { id, level } = queue[head++];
-      const node = nodeMap.get(id);
-  
-      if (node?.type === 'decision') {
-        [node.data.negativePath, node.data.positivePath]
-          .filter(Boolean)
-          .forEach(childId => {
-            if (!visited.has(childId)) {
-                visited.add(childId);
-                levels.set(childId, level + 1);
-                queue.push({ id: childId, level: level + 1 });
-            }
-          });
-      }
-    }
-  
-    // Iteratively fix violations to ensure every edge points downwards.
-    // This correctly handles complex DAGs by finding the longest path to each node.
-    let changed = true;
-    while (changed) {
-      changed = false;
-      nodes.forEach(u => {
-        if (u.type === 'decision') {
-          [u.data.negativePath, u.data.positivePath]
-            .filter(vId => vId && nodeMap.has(vId))
-            .forEach(vId => {
-              const uLevel = levels.get(u.id)!;
-              const vLevel = levels.get(vId)!;
-              if (uLevel >= vLevel) {
-                levels.set(vId, uLevel + 1);
-                changed = true;
-              }
-            });
-        }
-      });
-    }
-
-    // Assign a default level for any disconnected nodes
-    nodes.forEach(n => {
-        if (!levels.has(n.id)) {
-            levels.set(n.id, 0); 
-        }
-    });
-    
-    const nodesByLevel = new Map<number, string[]>();
-    newNodes.forEach(n => {
-        const level = levels.get(n.id)!;
-        if (!nodesByLevel.has(level)) nodesByLevel.set(level, []);
-        nodesByLevel.get(level)!.push(n.id);
-    });
-    
     const decisionNodes = newNodes.filter(n => n.type === 'decision');
     const terminatorNodes = newNodes.filter(n => n.type === 'terminator');
     terminatorNodes.sort((a,b) => a.id.localeCompare(b.id));
 
-    // 2. Position terminator nodes first, they form the layout baseline
-    const decisionLevels = Array.from(new Set(decisionNodes.map(n => levels.get(n.id)!)));
-    const maxDecisionLevel = decisionLevels.length > 0 ? Math.max(...decisionLevels) : -1;
-    const terminatorY = (maxDecisionLevel + 1) * LEVEL_HEIGHT + PADDING;
+    // 1. Position terminator nodes first, they form the layout baseline
+    const maxDecisionLevel = decisionNodes.length > 0 ? (
+        decisionNodes.reduce((max, node) => {
+            const children = [node.data.negativePath, node.data.positivePath].filter(Boolean);
+            return Math.max(max, children.length > 0 ? 1 : 0);
+        }, 0)
+    ) : -1;
+    
+    const maxLevel = newNodes.reduce((max, n) => {
+        const children = n.type === 'decision' ? [n.data.negativePath, n.data.positivePath].filter(Boolean) : [];
+        return Math.max(max, children.length);
+    }, 0);
+
+    const levels = new Map<string, number>();
+    const toProcess = [startNodeId];
+    const processed = new Set<string>();
+    levels.set(startNodeId, 0);
+
+    while(toProcess.length > 0) {
+        const currentId = toProcess.shift()!;
+        if(processed.has(currentId)) continue;
+        processed.add(currentId);
+
+        const node = nodeMap.get(currentId);
+        if(!node || node.type !== 'decision') continue;
+        
+        const currentLevel = levels.get(currentId)!;
+        [node.data.negativePath, node.data.positivePath].filter(Boolean).forEach(childId => {
+            if(!levels.has(childId) || levels.get(childId)! < currentLevel + 1) {
+                levels.set(childId, currentLevel + 1);
+            }
+            toProcess.push(childId);
+        });
+    }
+
+    const maxNodeLevel = Math.max(0, ...Array.from(levels.values()));
+    const terminatorY = (maxNodeLevel + 1) * LEVEL_HEIGHT + PADDING;
     
     terminatorNodes.forEach((node, i) => {
         positions.set(node.id, { x: i * NODE_WIDTH + PADDING, y: terminatorY });
     });
 
-    // 3. Position decision nodes bottom-up
-    const sortedDecisionLevels = decisionLevels.sort((a,b) => b-a);
-    for (const level of sortedDecisionLevels) {
-        const levelNodes = nodesByLevel.get(level)!.filter(id => nodeMap.get(id)?.type === 'decision');
-        for (const nodeId of levelNodes) {
-            if (positions.has(nodeId)) continue;
-            
-            const node = nodeMap.get(nodeId) as DecisionNode;
-            const childrenIds = [node.data.positivePath, node.data.negativePath].filter(id => id && positions.has(id));
-            
-            let x;
-            if (childrenIds.length > 0) {
-                const childPositions = childrenIds.map(id => positions.get(id)!);
-                x = childPositions.reduce((sum, pos) => sum + pos.x, 0) / childPositions.length;
-            } else {
-                const nodesOnLevel = nodesByLevel.get(level)!;
-                const nodeIndex = nodesOnLevel.indexOf(nodeId);
-                x = nodeIndex * NODE_WIDTH + PADDING; 
-            }
-            positions.set(nodeId, { x, y: level * LEVEL_HEIGHT + PADDING });
-        }
-    }
-  
-    // 4. Resolve overlaps by spreading decision nodes on each level
-    const allLevels = Array.from(nodesByLevel.keys()).sort((a,b) => a-b);
-    for (const level of allLevels) {
-        // ONLY PROCESS DECISION NODES IN THIS LOOP
-        const levelNodeIds = nodesByLevel.get(level)!.filter(id => nodeMap.get(id)?.type === 'decision');
-        if (levelNodeIds.length < 2) continue;
 
-        const levelPositions = levelNodeIds.map(id => ({ id, pos: positions.get(id)! })).filter(item => item.pos);
-        levelPositions.sort((a, b) => a.pos.x - b.pos.x);
+    // 3. Position decision nodes bottom-up
+    const decisionNodeIds = decisionNodes.map(n => n.id);
+    const positionedDecisions = new Set<string>();
+
+    const positionNode = (nodeId: string) => {
+        if(positionedDecisions.has(nodeId) || !nodeMap.has(nodeId) || nodeMap.get(nodeId)!.type === 'terminator') return;
+
+        const node = nodeMap.get(nodeId) as DecisionNode;
+        const childrenIds = [node.data.positivePath, node.data.negativePath].filter(id => id && nodeMap.has(id));
         
-        for (let i = 0; i < levelPositions.length - 1; i++) {
-            const nodeA = levelPositions[i];
-            const nodeB = levelPositions[i+1];
+        childrenIds.forEach(childId => {
+            if(decisionNodeIds.includes(childId)) {
+                positionNode(childId);
+            }
+        });
+
+        let x;
+        const childPositions = childrenIds.map(id => positions.get(id)!).filter(Boolean);
+        if (childPositions.length > 0) {
+            x = childPositions.reduce((sum, pos) => sum + pos.x, 0) / childPositions.length;
+        } else {
+            // This case should ideally not happen for a connected graph. Fallback.
+            x = (newNodes.length / 2) * NODE_WIDTH;
+        }
+
+        const level = levels.get(nodeId) || 0;
+        positions.set(nodeId, { x, y: level * LEVEL_HEIGHT + PADDING });
+        positionedDecisions.add(nodeId);
+    }
+    
+    decisionNodeIds.forEach(id => positionNode(id));
+
+    const nodesByLevel = new Map<number, string[]>();
+    decisionNodeIds.forEach(id => {
+        const level = levels.get(id);
+        if(level === undefined) return;
+        if(!nodesByLevel.has(level)) nodesByLevel.set(level, []);
+        nodesByLevel.get(level)!.push(id);
+    });
+
+    for(const level of Array.from(nodesByLevel.keys()).sort((a,b) => a-b)) {
+        const levelNodes = nodesByLevel.get(level)!;
+        if(levelNodes.length < 2) continue;
+
+        const sortedLevelNodes = levelNodes.map(id => ({id, pos: positions.get(id)!})).sort((a,b) => a.pos.x - b.pos.x);
+        
+        for (let i = 0; i < sortedLevelNodes.length - 1; i++) {
+            const nodeA = sortedLevelNodes[i];
+            const nodeB = sortedLevelNodes[i+1];
             const distance = nodeB.pos.x - nodeA.pos.x;
             if (distance < NODE_WIDTH) {
                 const shift = (NODE_WIDTH - distance) / 2;
-                nodeA.pos.x -= shift;
-                nodeB.pos.x += shift;
+                positions.get(nodeA.id)!.x -= shift;
+                positions.get(nodeB.id)!.x += shift;
             }
         }
-        // Re-center the whole level after spreading to align with the overall diagram
-        const totalWidth = levelPositions.length > 0 ? levelPositions[levelPositions.length-1].pos.x - levelPositions[0].pos.x : 0;
-        const currentCenter = totalWidth / 2 + (levelPositions[0]?.pos.x || 0);
-        
-        const terminatorPositions = terminatorNodes.map(n => positions.get(n.id)!).filter(Boolean);
-        let canvasCenter = PADDING;
-        if (terminatorPositions.length > 0) {
-            const minX = Math.min(...terminatorPositions.map(p => p.x));
-            const maxX = Math.max(...terminatorPositions.map(p => p.x));
-            canvasCenter = (minX + maxX) / 2;
-        } else if (levelPositions.length > 0) {
-            canvasCenter = (levelPositions[0].pos.x + levelPositions[levelPositions.length-1].pos.x) / 2;
-        }
-        
-        const shift = canvasCenter - currentCenter;
-        levelPositions.forEach(item => item.pos.x += shift);
     }
     
     // 5. Assign final positions
@@ -384,5 +350,3 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
   
     return newNodes;
   }
-
-    

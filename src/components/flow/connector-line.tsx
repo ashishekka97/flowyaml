@@ -31,13 +31,12 @@ export function ConnectorLine({ from, to, isPositive }: ConnectorLineProps) {
       {labelText && (
         <text
           x={from.x}
-          y={from.y - 8}
+          y={midY - 4}
           className={cn(
             "text-xs font-medium",
             isPositive ? "fill-green-700" : "fill-red-700"
           )}
-          textAnchor={isPositive ? "start" : "end"}
-          dx={isPositive ? 5 : -5}
+          textAnchor="middle"
         >
           {labelText}
         </text>

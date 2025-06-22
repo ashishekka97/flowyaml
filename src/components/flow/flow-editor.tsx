@@ -42,7 +42,7 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
         const positiveTargetNode = nodeMap.get(node.data.positivePath);
         
         if (sourceNode && negativeTargetNode) {
-          const fromPos: NodePosition = { x: sourceNode.position.x, y: sourceNode.position.y + 50 };
+          const fromPos: NodePosition = { x: sourceNode.position.x + 75, y: sourceNode.position.y + 75 };
           
           let toPos: NodePosition;
           toPos = { x: negativeTargetNode.position.x + 100, y: negativeTargetNode.position.y };
@@ -51,7 +51,7 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
         }
 
         if (sourceNode && positiveTargetNode) {
-          const fromPos: NodePosition = { x: sourceNode.position.x + 200, y: sourceNode.position.y + 50 };
+          const fromPos: NodePosition = { x: sourceNode.position.x + 125, y: sourceNode.position.y + 75 };
 
           let toPos: NodePosition;
           toPos = { x: positiveTargetNode.position.x + 100, y: positiveTargetNode.position.y };
@@ -67,8 +67,8 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
   const canvasHeight = 4000;
 
   return (
-    <div className="relative w-full h-full">
-      <div className="w-full h-full bg-background overflow-auto">
+    <div className="relative w-full h-full bg-background overflow-hidden">
+      <div className="w-full h-full overflow-auto">
         <div
           className="relative"
           style={{
