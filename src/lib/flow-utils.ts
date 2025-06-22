@@ -229,52 +229,82 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
   export function autoLayout(nodes: FlowNode[], startNodeId: string): FlowNode[] {
     if (!nodes.length || !nodes.some(n => n.id === startNodeId)) return nodes;
   
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+  
+    // 1. Calculate in-degrees for topological sort
+    const inDegrees = new Map<string, number>();
+    nodes.forEach(n => inDegrees.set(n.id, 0));
+  
+    nodes.forEach(node => {
+      if (node.type === 'decision') {
+        const { positivePath, negativePath } = node.data;
+        if (positivePath && inDegrees.has(positivePath)) {
+          inDegrees.set(positivePath, (inDegrees.get(positivePath) || 0) + 1);
+        }
+        if (negativePath && inDegrees.has(negativePath)) {
+          inDegrees.set(negativePath, (inDegrees.get(negativePath) || 0) + 1);
+        }
+      }
+    });
+  
+    // 2. Perform topological sort (Kahn's algorithm)
+    const queue: string[] = [];
+    nodes.forEach(node => {
+      if (inDegrees.get(node.id) === 0) {
+        queue.push(node.id);
+      }
+    });
+  
+    const sortedNodeIds: string[] = [];
+    while (queue.length > 0) {
+      // Using sort to make layout more deterministic
+      queue.sort((a,b) => a.localeCompare(b));
+      const uId = queue.shift()!;
+      sortedNodeIds.push(uId);
+      
+      const uNode = nodeMap.get(uId)!;
+      if (uNode.type === 'decision') {
+        [uNode.data.negativePath, uNode.data.positivePath]
+          .filter(id => id && nodeMap.has(id))
+          .forEach(vId => {
+            const newDegree = (inDegrees.get(vId) || 1) - 1;
+            inDegrees.set(vId, newDegree);
+            if (newDegree === 0) {
+              queue.push(vId);
+            }
+          });
+      }
+    }
+  
+    // Handle cycles or unreachable nodes by just appending them
+    if (sortedNodeIds.length < nodes.length) {
+      nodes.forEach(node => {
+        if (!sortedNodeIds.includes(node.id)) {
+          sortedNodeIds.push(node.id);
+        }
+      });
+    }
+  
+    // 3. Calculate levels based on the longest path from a source
+    const levels = new Map<string, number>();
+    nodes.forEach(n => levels.set(n.id, 0));
+  
+    sortedNodeIds.forEach(uId => {
+      const uNode = nodeMap.get(uId)!;
+      const uLevel = levels.get(uId)!;
+      if (uNode.type === 'decision') {
+        [uNode.data.negativePath, uNode.data.positivePath]
+          .filter(id => id && nodeMap.has(id))
+          .forEach(vId => {
+            levels.set(vId, Math.max(levels.get(vId)!, uLevel + 1));
+          });
+      }
+    });
+  
+    // 4. Position nodes based on calculated levels
     const LEVEL_HEIGHT = 200;
     const NODE_WIDTH = 300;
     const PADDING = 50;
-  
-    const nodeMap = new Map(nodes.map(n => [n.id, n]));
-    const levels = new Map<string, number>();
-    const visited = new Set<string>();
-    
-    const queue: string[] = [];
-    if (nodeMap.has(startNodeId)) {
-      queue.push(startNodeId);
-      visited.add(startNodeId);
-      levels.set(startNodeId, 0);
-    }
-  
-    let head = 0;
-    while(head < queue.length) {
-      const uId = queue[head++];
-      const uNode = nodeMap.get(uId)!;
-      
-      if (uNode.type === 'decision') {
-        const uLevel = levels.get(uId)!;
-        const children = [uNode.data.negativePath, uNode.data.positivePath].filter(id => id && nodeMap.has(id));
-        
-        for (const vId of children) {
-          if (!visited.has(vId)) {
-            visited.add(vId);
-            levels.set(vId, uLevel + 1);
-            queue.push(vId);
-          }
-        }
-      }
-    }
-  
-    let maxLevel = -1;
-    levels.forEach(level => {
-      if (level > maxLevel) maxLevel = level;
-    });
-    
-    nodes.forEach(node => {
-      if (!visited.has(node.id)) {
-        maxLevel++;
-        levels.set(node.id, maxLevel);
-        visited.add(node.id);
-      }
-    });
   
     const decisionNodesByLevel = new Map<number, string[]>();
     const terminatorNodeIds: string[] = [];
@@ -294,14 +324,14 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
     });
   
     const newNodes = [...nodes];
-    
+      
     const maxNodesOnDecisionLevel = decisionNodesByLevel.size > 0 
       ? Math.max(0, ...Array.from(decisionNodesByLevel.values()).map(levelNodes => levelNodes.length))
       : 0;
     const canvasWidth = Math.max(maxNodesOnDecisionLevel, terminatorNodeIds.length) * NODE_WIDTH;
   
     const sortedLevels = Array.from(decisionNodesByLevel.keys()).sort((a, b) => a - b);
-    
+      
     sortedLevels.forEach(level => {
       const levelNodeIds = decisionNodesByLevel.get(level)!;
       levelNodeIds.sort((a, b) => a.localeCompare(b));
