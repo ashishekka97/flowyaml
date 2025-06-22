@@ -226,127 +226,153 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
     return { nodes, inputs, startNodeId };
   }
 
-  export function autoLayout(nodes: FlowNode[], startNodeId: string): FlowNode[] {
+export function autoLayout(nodes: FlowNode[], startNodeId: string): FlowNode[] {
     if (!nodes.length || !nodes.some(n => n.id === startNodeId)) return nodes;
   
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
-    const newNodes = [...nodes];
-    const positions = new Map<string, { x: number, y: number }>();
-    const PADDING = 50;
-    const LEVEL_HEIGHT = 180;
-    const NODE_WIDTH = 250;
+    const adj = new Map<string, string[]>();
+    const inDegree = new Map<string, number>();
   
-    const decisionNodes = newNodes.filter(n => n.type === 'decision');
-    const terminatorNodes = newNodes.filter(n => n.type === 'terminator');
-    terminatorNodes.sort((a,b) => a.id.localeCompare(b.id));
-
-    // 1. Position terminator nodes first, they form the layout baseline
-    const maxDecisionLevel = decisionNodes.length > 0 ? (
-        decisionNodes.reduce((max, node) => {
-            const children = [node.data.negativePath, node.data.positivePath].filter(Boolean);
-            return Math.max(max, children.length > 0 ? 1 : 0);
-        }, 0)
-    ) : -1;
-    
-    const maxLevel = newNodes.reduce((max, n) => {
-        const children = n.type === 'decision' ? [n.data.negativePath, n.data.positivePath].filter(Boolean) : [];
-        return Math.max(max, children.length);
-    }, 0);
-
-    const levels = new Map<string, number>();
-    const toProcess = [startNodeId];
-    const processed = new Set<string>();
-    levels.set(startNodeId, 0);
-
-    while(toProcess.length > 0) {
-        const currentId = toProcess.shift()!;
-        if(processed.has(currentId)) continue;
-        processed.add(currentId);
-
-        const node = nodeMap.get(currentId);
-        if(!node || node.type !== 'decision') continue;
-        
-        const currentLevel = levels.get(currentId)!;
-        [node.data.negativePath, node.data.positivePath].filter(Boolean).forEach(childId => {
-            if(!levels.has(childId) || levels.get(childId)! < currentLevel + 1) {
-                levels.set(childId, currentLevel + 1);
-            }
-            toProcess.push(childId);
-        });
+    // 1. Build adjacency list and in-degree map
+    for (const node of nodes) {
+      adj.set(node.id, []);
+      inDegree.set(node.id, 0);
     }
-
-    const maxNodeLevel = Math.max(0, ...Array.from(levels.values()));
-    const terminatorY = (maxNodeLevel + 1) * LEVEL_HEIGHT + PADDING;
-    
-    terminatorNodes.forEach((node, i) => {
-        positions.set(node.id, { x: i * NODE_WIDTH + PADDING, y: terminatorY });
-    });
-
-
-    // 3. Position decision nodes bottom-up
-    const decisionNodeIds = decisionNodes.map(n => n.id);
-    const positionedDecisions = new Set<string>();
-
-    const positionNode = (nodeId: string) => {
-        if(positionedDecisions.has(nodeId) || !nodeMap.has(nodeId) || nodeMap.get(nodeId)!.type === 'terminator') return;
-
-        const node = nodeMap.get(nodeId) as DecisionNode;
-        const childrenIds = [node.data.positivePath, node.data.negativePath].filter(id => id && nodeMap.has(id));
-        
-        childrenIds.forEach(childId => {
-            if(decisionNodeIds.includes(childId)) {
-                positionNode(childId);
-            }
-        });
-
-        let x;
-        const childPositions = childrenIds.map(id => positions.get(id)!).filter(Boolean);
-        if (childPositions.length > 0) {
-            x = childPositions.reduce((sum, pos) => sum + pos.x, 0) / childPositions.length;
-        } else {
-            // This case should ideally not happen for a connected graph. Fallback.
-            x = (newNodes.length / 2) * NODE_WIDTH;
+  
+    for (const node of nodes) {
+      if (node.type === 'decision') {
+        const children = [node.data.positivePath, node.data.negativePath].filter(id => id && nodeMap.has(id));
+        for (const childId of children) {
+          adj.get(node.id)!.push(childId);
+          inDegree.set(childId, (inDegree.get(childId) || 0) + 1);
         }
-
-        const level = levels.get(nodeId) || 0;
-        positions.set(nodeId, { x, y: level * LEVEL_HEIGHT + PADDING });
-        positionedDecisions.add(nodeId);
+      }
     }
-    
-    decisionNodeIds.forEach(id => positionNode(id));
-
-    const nodesByLevel = new Map<number, string[]>();
-    decisionNodeIds.forEach(id => {
-        const level = levels.get(id);
-        if(level === undefined) return;
-        if(!nodesByLevel.has(level)) nodesByLevel.set(level, []);
-        nodesByLevel.get(level)!.push(id);
-    });
-
-    for(const level of Array.from(nodesByLevel.keys()).sort((a,b) => a-b)) {
-        const levelNodes = nodesByLevel.get(level)!;
-        if(levelNodes.length < 2) continue;
-
-        const sortedLevelNodes = levelNodes.map(id => ({id, pos: positions.get(id)!})).sort((a,b) => a.pos.x - b.pos.x);
-        
-        for (let i = 0; i < sortedLevelNodes.length - 1; i++) {
-            const nodeA = sortedLevelNodes[i];
-            const nodeB = sortedLevelNodes[i+1];
-            const distance = nodeB.pos.x - nodeA.pos.x;
-            if (distance < NODE_WIDTH) {
-                const shift = (NODE_WIDTH - distance) / 2;
-                positions.get(nodeA.id)!.x -= shift;
-                positions.get(nodeB.id)!.x += shift;
-            }
-        }
-    }
-    
-    // 5. Assign final positions
-    newNodes.forEach(node => {
-      if (positions.has(node.id)) {
-        node.position = positions.get(node.id)!;
+  
+    // 2. Topological sort (Kahn's) to get levels (longest path from source)
+    const queue: string[] = [];
+    nodes.forEach(node => {
+      if (inDegree.get(node.id) === 0) {
+        queue.push(node.id);
       }
     });
   
+    const levels = new Map<string, number>();
+    nodes.forEach(node => levels.set(node.id, 0));
+    
+    const sortedNodes: string[] = [];
+  
+    while (queue.length > 0) {
+      const u = queue.shift()!;
+      sortedNodes.push(u);
+  
+      const children = adj.get(u) || [];
+      for (const v of children) {
+        const newLevel = (levels.get(u) || 0) + 1;
+        if (newLevel > (levels.get(v) || 0)) {
+          levels.set(v, newLevel);
+        }
+        inDegree.set(v, (inDegree.get(v) || 0) - 1);
+        if (inDegree.get(v) === 0) {
+          queue.push(v);
+        }
+      }
+    }
+  
+    // Cycle detection
+    if (sortedNodes.length !== nodes.length) {
+      console.error("Cycle detected in flowchart, layout may be incorrect.");
+    }
+    
+    // 3. Position nodes
+    const PADDING_X = 100;
+    const PADDING_Y = 50;
+    const LEVEL_HEIGHT = 200;
+    const NODE_WIDTH = 250;
+    const positions = new Map<string, { x: number, y: number }>();
+    
+    // Group nodes by level
+    const nodesByLevel = new Map<number, string[]>();
+    let maxDecisionLevel = 0;
+    for (const node of nodes) {
+        if (node.type === 'decision') {
+            const level = levels.get(node.id) || 0;
+            if (!nodesByLevel.has(level)) {
+                nodesByLevel.set(level, []);
+            }
+            nodesByLevel.get(level)!.push(node.id);
+            if (level > maxDecisionLevel) {
+              maxDecisionLevel = level;
+            }
+        }
+    }
+  
+    // 4. Position terminator nodes at the bottom
+    const terminatorNodes = nodes.filter(n => n.type === 'terminator');
+    terminatorNodes.sort((a,b) => a.id.localeCompare(b.id));
+    const terminatorY = (maxDecisionLevel + 1) * LEVEL_HEIGHT + PADDING_Y;
+    terminatorNodes.forEach((node, i) => {
+      positions.set(node.id, {
+          x: i * (NODE_WIDTH + PADDING_X) + PADDING_X,
+          y: terminatorY
+      });
+    });
+  
+    // 5. Position decision nodes from bottom-up (using reverse topological order)
+    const reversedSortedNodes = [...sortedNodes].reverse();
+    for (const nodeId of reversedSortedNodes) {
+        const node = nodeMap.get(nodeId);
+        if (!node || node.type === 'terminator') continue;
+  
+        const level = levels.get(nodeId) || 0;
+        const y = level * LEVEL_HEIGHT + PADDING_Y;
+  
+        let x: number;
+        const children = adj.get(nodeId)?.filter(id => positions.has(id)) || [];
+        if (children.length > 0) {
+            const childPositions = children.map(id => positions.get(id)!);
+            x = childPositions.reduce((sum, pos) => sum + pos.x, 0) / childPositions.length;
+        } else {
+            const levelNodes = nodesByLevel.get(level) || [];
+            const indexInLevel = levelNodes.indexOf(nodeId);
+            x = indexInLevel * (NODE_WIDTH + PADDING_X) + PADDING_X;
+        }
+        positions.set(nodeId, { x, y });
+    }
+  
+    // 6. Resolve horizontal overlaps
+    const sortedLevels = Array.from(nodesByLevel.keys()).sort((a, b) => a - b);
+    for (const level of sortedLevels) {
+      const levelNodes = (nodesByLevel.get(level) || []).map(id => ({ id, pos: positions.get(id)! })).sort((a, b) => a.pos.x - b.pos.x);
+      for (let i = 0; i < levelNodes.length - 1; i++) {
+          const nodeA = levelNodes[i];
+          const nodeB = levelNodes[i+1];
+          const desiredSpacing = NODE_WIDTH + PADDING_X / 2;
+          const currentSpacing = nodeB.pos.x - nodeA.pos.x;
+          if (currentSpacing < desiredSpacing) {
+              const shift = (desiredSpacing - currentSpacing);
+              for (let j = i + 1; j < levelNodes.length; j++) {
+                  levelNodes[j].pos.x += shift;
+              }
+          }
+      }
+    }
+  
+    // Find minX to shift entire graph to be positive
+    let minX = Infinity;
+    for(const pos of positions.values()) {
+        minX = Math.min(minX, pos.x);
+    }
+    const xOffset = minX < PADDING_X ? PADDING_X - minX : 0;
+  
+    // 7. Apply final positions
+    const newNodes = nodes.map(node => {
+      if (positions.has(node.id)) {
+        const pos = positions.get(node.id)!;
+        return { ...node, position: {x: pos.x + xOffset, y: pos.y} };
+      }
+      return { ...node, position: { x: PADDING_X, y: PADDING_Y } }; // Fallback for unsorted nodes
+    });
+  
     return newNodes;
-  }
+}
