@@ -120,9 +120,21 @@ export function generateYaml(nodes: FlowNode[], inputs: Input[], startNodeId: st
     nodes: {},
   };
 
-  nodes.forEach(node => {
+  const sortedNodes = [...nodes].sort((a, b) => a.id.localeCompare(b.id));
+
+  sortedNodes.forEach(node => {
     if (node.type === 'decision') {
-      yamlObject.nodes[node.id] = new DecisionFlowData(node.data);
+      const data: any = {
+        condition: node.data.condition,
+      };
+      // Ensure negative path comes first if it exists
+      if (node.data.negativePath) {
+        data.negativePath = node.data.negativePath;
+      }
+      if (node.data.positivePath) {
+        data.positivePath = node.data.positivePath;
+      }
+      yamlObject.nodes[node.id] = new DecisionFlowData(data);
     } else if (node.type === 'terminator') {
       yamlObject.nodes[node.id] = new TerminatorFlowData(node.data);
     }
@@ -131,13 +143,19 @@ export function generateYaml(nodes: FlowNode[], inputs: Input[], startNodeId: st
   let yamlString = yaml.dump(yamlObject, {
     schema: FLOW_SCHEMA,
     noRefs: true,
+    sortKeys: (a, b) => {
+        const order = ['condition', 'negativePath', 'positivePath', 'output'];
+        const indexA = order.indexOf(a);
+        const indexB = order.indexOf(b);
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        return a.localeCompare(b);
+    }
   });
   
-  // The !!map part is still needed if nodes is empty
-  yamlString = yamlString.replace("nodes: {}", "nodes: !!map");
+  yamlString = yamlString.replace("nodes: {}", "nodes: !!map {}");
   
-  // The dumper can sometimes URL-encode special characters.
-  // We can decode them for display purposes.
   return decodeURI(yamlString);
 }
 
@@ -208,130 +226,119 @@ export function parseYaml(yamlString: string): { nodes: FlowNode[], inputs: Inpu
     return { nodes, inputs, startNodeId };
   }
 
-export function autoLayout(nodes: FlowNode[], startNodeId: string): FlowNode[] {
-  if (!nodes.length || !nodes.some(n => n.id === startNodeId)) return nodes;
-
-  const LEVEL_HEIGHT = 200;
-  const NODE_WIDTH = 300;
-  const PADDING = 50;
-
-  const nodeMap = new Map(nodes.map(n => [n.id, n]));
-  const levels = new Map<string, number>();
-  const nodesPerLevel = new Map<number, string[]>();
-  const visited = new Set<string>();
-  const queue: string[] = [];
-
-  if (nodeMap.has(startNodeId)) {
-    queue.push(startNodeId);
-    visited.add(startNodeId);
-    levels.set(startNodeId, 0);
-  }
-
-  let head = 0;
-  while(head < queue.length) {
-    const uId = queue[head++];
-    const uNode = nodeMap.get(uId)!;
-    const uLevel = levels.get(uId)!;
-
-    if (!nodesPerLevel.has(uLevel)) {
-      nodesPerLevel.set(uLevel, []);
-    }
-    if (!nodesPerLevel.get(uLevel)!.includes(uId)) {
-      nodesPerLevel.get(uLevel)!.push(uId);
-    }
-
-    if (uNode.type === 'decision') {
-      const children = [uNode.data.negativePath, uNode.data.positivePath].filter(id => id && nodeMap.has(id));
-      for (const vId of children) {
-        if (!visited.has(vId)) {
-          visited.add(vId);
-          levels.set(vId, uLevel + 1);
-          queue.push(vId);
-        }
-      }
-    }
-  }
+  export function autoLayout(nodes: FlowNode[], startNodeId: string): FlowNode[] {
+    if (!nodes.length || !nodes.some(n => n.id === startNodeId)) return nodes;
   
-  let lastDiscoveredLevel = nodesPerLevel.size > 0 ? Math.max(...nodesPerLevel.keys()) : -1;
-  nodes.forEach(node => {
-      if (!visited.has(node.id)) {
-          lastDiscoveredLevel++;
-          if (!nodesPerLevel.has(lastDiscoveredLevel)) {
-              nodesPerLevel.set(lastDiscoveredLevel, []);
+    const LEVEL_HEIGHT = 200;
+    const NODE_WIDTH = 300;
+    const PADDING = 50;
+  
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const levels = new Map<string, number>();
+    const visited = new Set<string>();
+    
+    const queue: string[] = [];
+    if (nodeMap.has(startNodeId)) {
+      queue.push(startNodeId);
+      visited.add(startNodeId);
+      levels.set(startNodeId, 0);
+    }
+  
+    let head = 0;
+    while(head < queue.length) {
+      const uId = queue[head++];
+      const uNode = nodeMap.get(uId)!;
+      
+      if (uNode.type === 'decision') {
+        const uLevel = levels.get(uId)!;
+        const children = [uNode.data.negativePath, uNode.data.positivePath].filter(id => id && nodeMap.has(id));
+        
+        for (const vId of children) {
+          if (!visited.has(vId)) {
+            visited.add(vId);
+            levels.set(vId, uLevel + 1);
+            queue.push(vId);
           }
-          nodesPerLevel.get(lastDiscoveredLevel)!.push(node.id);
-          visited.add(node.id);
-      }
-  });
-
-
-  const decisionNodesPerLevel = new Map<number, string[]>();
-  const terminatorNodeIds: string[] = [];
-
-  nodesPerLevel.forEach((levelNodeIds, level) => {
-    const decisions: string[] = [];
-    levelNodeIds.forEach(nodeId => {
-      if (nodeMap.get(nodeId)!.type === 'decision') {
-        decisions.push(nodeId);
-      } else {
-        if (!terminatorNodeIds.includes(nodeId)) {
-            terminatorNodeIds.push(nodeId);
         }
       }
-    });
-    if (decisions.length > 0) {
-      decisionNodesPerLevel.set(level, decisions);
     }
-  });
-
-  nodes.forEach(node => {
-    if(node.type === 'terminator' && !terminatorNodeIds.includes(node.id)) {
-        terminatorNodeIds.push(node.id);
-    }
-  });
-
-  const newNodes = [...nodes];
-  const maxDecisionLevel = decisionNodesPerLevel.size > 0 ? Math.max(...decisionNodesPerLevel.keys()) : -1;
   
-  const maxDecisionLevelWidth = Math.max(0, ...Array.from(decisionNodesPerLevel.values()).map(levelNodes => levelNodes.length));
-  const canvasWidth = Math.max(maxDecisionLevelWidth, terminatorNodeIds.length) * NODE_WIDTH;
-
-  decisionNodesPerLevel.forEach((levelNodeIds, level) => {
-    const levelY = level * LEVEL_HEIGHT + PADDING;
-    const levelWidth = levelNodeIds.length * NODE_WIDTH;
-    const startX = (canvasWidth - levelWidth) / 2 + PADDING;
-
-    levelNodeIds.sort((a,b) => a.localeCompare(b));
-
-    levelNodeIds.forEach((nodeId, i) => {
-      const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
-      if (nodeIndex !== -1) {
-        newNodes[nodeIndex].position = {
-          x: startX + i * NODE_WIDTH,
-          y: levelY,
-        };
+    let maxLevel = -1;
+    levels.forEach(level => {
+      if (level > maxLevel) maxLevel = level;
+    });
+    
+    nodes.forEach(node => {
+      if (!visited.has(node.id)) {
+        maxLevel++;
+        levels.set(node.id, maxLevel);
+        visited.add(node.id);
       }
     });
-  });
-
-  if (terminatorNodeIds.length > 0) {
-    const terminatorLevel = maxDecisionLevel + 1;
-    const levelY = terminatorLevel * LEVEL_HEIGHT + PADDING;
-    const levelWidth = terminatorNodeIds.length * NODE_WIDTH;
-    const startX = (canvasWidth - levelWidth) / 2 + PADDING;
-
-    terminatorNodeIds.sort((a,b) => a.localeCompare(b));
-
-    terminatorNodeIds.forEach((nodeId, i) => {
-      const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
-      if (nodeIndex !== -1) {
-        newNodes[nodeIndex].position = {
-          x: startX + i * NODE_WIDTH,
-          y: levelY,
-        };
+  
+    const decisionNodesByLevel = new Map<number, string[]>();
+    const terminatorNodeIds: string[] = [];
+  
+    nodes.forEach(node => {
+      const level = levels.get(node.id);
+      if (level === undefined) return;
+  
+      if (node.type === 'decision') {
+        if (!decisionNodesByLevel.has(level)) {
+          decisionNodesByLevel.set(level, []);
+        }
+        decisionNodesByLevel.get(level)!.push(node.id);
+      } else {
+        terminatorNodeIds.push(node.id);
       }
     });
+  
+    const newNodes = [...nodes];
+    
+    const maxNodesOnDecisionLevel = decisionNodesByLevel.size > 0 
+      ? Math.max(0, ...Array.from(decisionNodesByLevel.values()).map(levelNodes => levelNodes.length))
+      : 0;
+    const canvasWidth = Math.max(maxNodesOnDecisionLevel, terminatorNodeIds.length) * NODE_WIDTH;
+  
+    const sortedLevels = Array.from(decisionNodesByLevel.keys()).sort((a, b) => a - b);
+    
+    sortedLevels.forEach(level => {
+      const levelNodeIds = decisionNodesByLevel.get(level)!;
+      levelNodeIds.sort((a, b) => a.localeCompare(b));
+  
+      const levelY = level * LEVEL_HEIGHT + PADDING;
+      const levelWidth = levelNodeIds.length * NODE_WIDTH;
+      const startX = (canvasWidth - levelWidth) / 2 + PADDING;
+  
+      levelNodeIds.forEach((nodeId, i) => {
+        const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
+        if (nodeIndex !== -1) {
+          newNodes[nodeIndex].position = {
+            x: startX + i * NODE_WIDTH,
+            y: levelY,
+          };
+        }
+      });
+    });
+  
+    if (terminatorNodeIds.length > 0) {
+      const terminatorLevel = (sortedLevels.length > 0 ? sortedLevels[sortedLevels.length - 1] : -1) + 1;
+      const levelY = terminatorLevel * LEVEL_HEIGHT + PADDING;
+      const levelWidth = terminatorNodeIds.length * NODE_WIDTH;
+      const startX = (canvasWidth - levelWidth) / 2 + PADDING;
+  
+      terminatorNodeIds.sort((a,b) => a.localeCompare(b));
+  
+      terminatorNodeIds.forEach((nodeId, i) => {
+        const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
+        if (nodeIndex !== -1) {
+          newNodes[nodeIndex].position = {
+            x: startX + i * NODE_WIDTH,
+            y: levelY,
+          };
+        }
+      });
+    }
+  
+    return newNodes;
   }
-
-  return newNodes;
-}
