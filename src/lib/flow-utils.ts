@@ -1,5 +1,50 @@
-import { type FlowNode, type Input, type DecisionNode, type TerminatorNode } from '@/types';
+import { type FlowNode, type Input, type DecisionNodeData, type TerminatorNodeData } from '@/types';
 import * as yaml from 'js-yaml';
+
+// Helper classes for YAML serialization
+class DecisionFlowData {
+  condition: string;
+  positivePath: string;
+  negativePath: string;
+  constructor(data: DecisionNodeData) {
+    this.condition = data.condition;
+    this.positivePath = data.positivePath;
+    this.negativePath = data.negativePath;
+  }
+}
+
+class TerminatorFlowData {
+  output: Record<string, any>;
+  constructor(data: TerminatorNodeData) {
+    this.output = data.output;
+  }
+}
+
+// Define custom YAML types for js-yaml
+const DecisionYamlType = new yaml.Type('!<decision>', {
+  kind: 'mapping',
+  instanceOf: DecisionFlowData,
+  represent: (data: DecisionFlowData) => {
+    return {
+      condition: data.condition,
+      positivePath: data.positivePath,
+      negativePath: data.negativePath,
+    };
+  },
+});
+
+const TerminatorYamlType = new yaml.Type('!<terminator>', {
+  kind: 'mapping',
+  instanceOf: TerminatorFlowData,
+  represent: (data: TerminatorFlowData) => {
+    return {
+      output: data.output,
+    };
+  },
+});
+
+const FLOW_SCHEMA = yaml.DEFAULT_SCHEMA.extend([DecisionYamlType, TerminatorYamlType]);
+
 
 export const INITIAL_INPUTS: Input[] = [
   { name: 'isLoyalCustomer', type: 'Boolean' },
@@ -64,33 +109,19 @@ export function generateYaml(nodes: FlowNode[], inputs: Input[], startNodeId: st
   };
 
   nodes.forEach(node => {
-    let nodeData: any = {};
     if (node.type === 'decision') {
-      const decisionNode = node as DecisionNode;
-      nodeData = {
-        '!<decision>': {
-          condition: decisionNode.data.condition,
-          positivePath: decisionNode.data.positivePath,
-          negativePath: decisionNode.data.negativePath,
-        }
-      };
+      yamlObject.nodes[node.id] = new DecisionFlowData(node.data);
     } else if (node.type === 'terminator') {
-      const terminatorNode = node as TerminatorNode;
-      nodeData = {
-        '!<terminator>': {
-          output: terminatorNode.data.output,
-        }
-      };
+      yamlObject.nodes[node.id] = new TerminatorFlowData(node.data);
     }
-    yamlObject.nodes[node.id] = nodeData;
   });
   
-  // A bit of a hack to get the !!map and !<tags> formatting right with js-yaml
   let yamlString = yaml.dump(yamlObject, {
+    schema: FLOW_SCHEMA,
     noRefs: true,
   });
-
-  yamlString = yamlString.replace(/!<([^>]+)>:/g, '!<$1>');
+  
+  // The !!map part is still needed if nodes is empty
   yamlString = yamlString.replace("nodes: {}", "nodes: !!map");
   
   return yamlString;
