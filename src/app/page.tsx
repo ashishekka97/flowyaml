@@ -102,6 +102,19 @@ export default function Home() {
     }
   };
 
+  const handleMouseLeave = () => {
+    // Stop any dragging or panning when mouse leaves the container
+    // This prevents the cursor from getting stuck in the 'grabbing' state
+    if (draggedNode) {
+        document.body.style.cursor = 'default';
+        setDraggedNode(null);
+    }
+    if (isPanning) {
+        setIsPanning(false);
+        document.body.style.cursor = 'default';
+    }
+  };
+
   const addNode = React.useCallback((type: 'decision' | 'terminator') => {
     const newNodeId = `${type}_${Date.now()}`;
     const newNode: FlowNode = {
@@ -212,12 +225,22 @@ export default function Home() {
   }, [startNodeId, toast]);
 
   const handleAutoLayout = React.useCallback(() => {
-    const laidOutNodes = autoLayout(nodes, startNodeId);
-    setNodes(laidOutNodes);
-    toast({
-      title: "Auto-Layout Complete",
-      description: "Nodes have been rearranged automatically.",
-    });
+    try {
+      const laidOutNodes = autoLayout(nodes, startNodeId);
+      setNodes(laidOutNodes);
+      toast({
+        title: "Auto-Layout Complete",
+        description: "Nodes have been rearranged automatically.",
+      });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "An unknown error occurred during auto-layout.";
+        toast({
+            variant: "destructive",
+            title: "Auto-Layout Failed",
+            description: message,
+        });
+        console.error(error);
+    }
   }, [nodes, startNodeId, toast]);
 
   const handleValidation = React.useCallback(async () => {
@@ -296,10 +319,11 @@ export default function Home() {
       <main className="flex flex-1 overflow-hidden">
         <NodePalette onAddNode={addNode} />
         <div 
-          className="flex-1 h-full min-w-0 cursor-default" 
+          className="flex-1 h-full min-w-0" 
           onMouseDown={handleCanvasMouseDown} 
           onMouseMove={handleMouseMove} 
           onMouseUp={handleMouseUp} 
+          onMouseLeave={handleMouseLeave}
           onWheel={handleWheel}
         >
           <FlowEditor
