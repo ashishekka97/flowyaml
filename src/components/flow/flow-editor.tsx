@@ -57,7 +57,7 @@ export function FlowEditor({
           let toPos: NodePosition;
           toPos = { x: negativeTargetNode.position.x + 100, y: negativeTargetNode.position.y };
           
-          lines.push(<ConnectorLine key={`${node.id}-neg`} from={fromPos} to={toPos} isPositive={false} />);
+          lines.push(<ConnectorLine key={`${node.id}-neg`} from={fromPos} to={toPos} isPositive={false} allNodes={nodes} sourceId={sourceNode.id} targetId={negativeTargetNode.id} />);
         }
 
         if (sourceNode && positiveTargetNode) {
@@ -66,7 +66,7 @@ export function FlowEditor({
           let toPos: NodePosition;
           toPos = { x: positiveTargetNode.position.x + 100, y: positiveTargetNode.position.y };
 
-          lines.push(<ConnectorLine key={`${node.id}-pos`} from={fromPos} to={toPos} isPositive />);
+          lines.push(<ConnectorLine key={`${node.id}-pos`} from={fromPos} to={toPos} isPositive allNodes={nodes} sourceId={sourceNode.id} targetId={positiveTargetNode.id}/>);
         }
       }
     }
