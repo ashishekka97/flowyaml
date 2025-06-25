@@ -281,7 +281,7 @@ export function autoLayout(nodes: FlowNode[], startNodeId: string): FlowNode[] {
   
     // Cycle detection
     if (sortedNodes.length !== nodes.length) {
-      console.error("Cycle detected in flowchart, layout may be incorrect.");
+      throw new Error("Cycle detected in flowchart. Please use the AI Validator to identify the issue, or manually correct the connections.");
     }
     
     // 3. Position nodes
