@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -295,7 +296,7 @@ export default function Home() {
       <main className="flex flex-1 overflow-hidden">
         <NodePalette onAddNode={addNode} />
         <div 
-          className="flex-1 h-full min-w-0 cursor-grab" 
+          className="flex-1 h-full min-w-0 cursor-default" 
           onMouseDown={handleCanvasMouseDown} 
           onMouseMove={handleMouseMove} 
           onMouseUp={handleMouseUp} 
