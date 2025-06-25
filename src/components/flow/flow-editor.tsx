@@ -15,9 +15,19 @@ interface FlowEditorProps {
   onNodeDragStart: (id:string, e: React.MouseEvent) => void;
   zoom: number;
   onZoomChange: (newZoom: number) => void;
+  scrollContainerRef: React.RefObject<HTMLDivElement>;
 }
 
-export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, onNodeDragStart, zoom, onZoomChange }: FlowEditorProps) {
+export function FlowEditor({ 
+  nodes, 
+  startNodeId, 
+  selectedNodeId, 
+  onNodeClick, 
+  onNodeDragStart, 
+  zoom, 
+  onZoomChange,
+  scrollContainerRef
+}: FlowEditorProps) {
   const nodeElements = React.useMemo(() => (
     nodes.map(node => (
       <FlowNodeComponent
@@ -68,9 +78,12 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
 
   return (
     <div className="relative w-full h-full bg-background overflow-hidden">
-      <div className="w-full h-full overflow-auto">
+      <div 
+        ref={scrollContainerRef}
+        className="w-full h-full overflow-auto"
+      >
         <div
-          className="relative"
+          className="relative pointer-events-none"
           style={{
             width: canvasWidth,
             height: canvasHeight,
@@ -86,7 +99,7 @@ export function FlowEditor({ nodes, startNodeId, selectedNodeId, onNodeClick, on
             {connectors}
           </svg>
           
-          <div className="relative w-full h-full">
+          <div className="relative w-full h-full pointer-events-auto">
             {nodeElements}
           </div>
         </div>

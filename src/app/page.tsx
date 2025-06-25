@@ -19,16 +19,17 @@ export default function Home() {
 
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
   const [draggedNode, setDraggedNode] = React.useState<{ id: string; startPos: NodePosition; startMouse: NodePosition } | null>(null);
+  
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const [isPanning, setIsPanning] = React.useState(false);
+  const [panStart, setPanStart] = React.useState({ x: 0, y: 0 });
+  const didPan = React.useRef(false);
 
   const yamlCode = React.useMemo(() => generateYaml(nodes, inputs, startNodeId), [nodes, inputs, startNodeId]);
 
   const handleNodeClick = React.useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedNodeId(id);
-  }, []);
-
-  const handleCanvasClick = React.useCallback(() => {
-    setSelectedNodeId(null);
   }, []);
 
   const handleNodeDragStart = React.useCallback((id: string, e: React.MouseEvent) => {
@@ -43,25 +44,62 @@ export default function Home() {
     });
   }, [nodes]);
 
-  const handleNodeDrag = React.useCallback((e: React.MouseEvent) => {
-    if (!draggedNode) return;
-    const dx = (e.clientX - draggedNode.startMouse.x) / zoom;
-    const dy = (e.clientY - draggedNode.startMouse.y) / zoom;
-    const newPosition = {
-      x: draggedNode.startPos.x + dx,
-      y: draggedNode.startPos.y + dy,
-    };
-    setNodes(prevNodes =>
-      prevNodes.map(n =>
-        n.id === draggedNode.id ? { ...n, position: newPosition } : n
-      )
-    );
-  }, [draggedNode, zoom]);
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    if (draggedNode || e.button !== 0) return;
+    
+    // Check if the click is on the background, not a node.
+    // The `onMouseDown` on nodes has `e.stopPropagation()`, so if the event
+    // reaches here, it's a background click.
+    setIsPanning(true);
+    didPan.current = false;
+    setPanStart({ x: e.clientX, y: e.clientY });
+    document.body.style.cursor = 'grabbing';
+  };
 
-  const handleNodeDragEnd = React.useCallback(() => {
-    document.body.style.cursor = 'default';
-    setDraggedNode(null);
-  }, []);
+  const handleMouseMove = (e: React.MouseEvent) => {
+    // Handle node dragging
+    if (draggedNode) {
+      const dx = (e.clientX - draggedNode.startMouse.x) / zoom;
+      const dy = (e.clientY - draggedNode.startMouse.y) / zoom;
+      const newPosition = {
+        x: draggedNode.startPos.x + dx,
+        y: draggedNode.startPos.y + dy,
+      };
+      setNodes(prevNodes =>
+        prevNodes.map(n =>
+          n.id === draggedNode.id ? { ...n, position: newPosition } : n
+        )
+      );
+      return;
+    }
+
+    // Handle canvas panning
+    if (isPanning && scrollContainerRef.current) {
+      if (!didPan.current && (Math.abs(e.clientX - panStart.x) > 3 || Math.abs(e.clientY - panStart.y) > 3)) {
+        didPan.current = true;
+      }
+      const dx = e.clientX - panStart.x;
+      const dy = e.clientY - panStart.y;
+      scrollContainerRef.current.scrollLeft -= dx;
+      scrollContainerRef.current.scrollTop -= dy;
+      setPanStart({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (draggedNode) {
+      document.body.style.cursor = 'default';
+      setDraggedNode(null);
+    }
+    if (isPanning) {
+      setIsPanning(false);
+      document.body.style.cursor = 'default';
+      // If we didn't pan, it was a click, so deselect the node.
+      if (!didPan.current) {
+        setSelectedNodeId(null);
+      }
+    }
+  };
 
   const addNode = React.useCallback((type: 'decision' | 'terminator') => {
     const newNodeId = `${type}_${Date.now()}`;
@@ -256,7 +294,13 @@ export default function Home() {
       <Header />
       <main className="flex flex-1 overflow-hidden">
         <NodePalette onAddNode={addNode} />
-        <div className="flex-1 h-full min-w-0" onMouseMove={handleNodeDrag} onMouseUp={handleNodeDragEnd} onClick={handleCanvasClick} onWheel={handleWheel}>
+        <div 
+          className="flex-1 h-full min-w-0 cursor-grab" 
+          onMouseDown={handleCanvasMouseDown} 
+          onMouseMove={handleMouseMove} 
+          onMouseUp={handleMouseUp} 
+          onWheel={handleWheel}
+        >
           <FlowEditor
             nodes={nodes}
             startNodeId={startNodeId}
@@ -265,6 +309,7 @@ export default function Home() {
             onNodeDragStart={handleNodeDragStart}
             zoom={zoom}
             onZoomChange={handleZoomChange}
+            scrollContainerRef={scrollContainerRef}
           />
         </div>
         <SidePanel
